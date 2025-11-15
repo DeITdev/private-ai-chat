@@ -23,12 +23,16 @@ const ChatPage = () => {
   );
 
   const handleSubmit = async () => {
+    if (!messageInput.trim()) return;
+
     await db.createMessage({
       content: messageInput,
       role: "user",
       thought: "",
       thread_id: params.threadId as string,
     });
+
+    setMessageInput("");
 
     const stream = await ollama.chat({
       model: "deepseek-r1:1.5b",
@@ -41,8 +45,6 @@ const ChatPage = () => {
       think: true,
       stream: true,
     });
-
-    setMessageInput("");
 
     let fullContent = "";
     let fullThought = "";
@@ -113,6 +115,12 @@ const ChatPage = () => {
             rows={5}
             value={messageInput}
             onChange={(e) => setMessageInput(e.target.value)}
+            onKeyDown={(e) => {
+              if (e.key === "Enter" && !e.shiftKey) {
+                e.preventDefault();
+                handleSubmit();
+              }
+            }}
           />
           <Button onClick={handleSubmit} type="button">
             Send
