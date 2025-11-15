@@ -38,6 +38,7 @@ const ChatPage = () => {
           content: messageInput.trim(),
         },
       ],
+      think: true,
       stream: true,
     });
 
@@ -46,26 +47,16 @@ const ChatPage = () => {
     let fullContent = "";
     let fullThought = "";
 
-    let outputMode: "think" | "response" = "think";
-
     for await (const part of stream) {
-      const messageContent = part.message.content;
-
-      if (outputMode === "think") {
-        if (
-          !(
-            messageContent.includes("<think>") ||
-            messageContent.includes("</think>")
-          )
-        ) {
-          fullThought += messageContent;
-        }
+      // Handle thinking chunks
+      if (part.message.thinking) {
+        fullThought += part.message.thinking;
         setStreamedThought(fullThought);
-        if (messageContent.includes("</think>")) {
-          outputMode = "response";
-        }
-      } else {
-        fullContent += messageContent;
+      }
+
+      // Handle content chunks
+      if (part.message.content) {
+        fullContent += part.message.content;
         setStreamedMessage(fullContent);
       }
     }
