@@ -27,6 +27,7 @@ const AvatarPage = () => {
   const [audioOutputs, setAudioOutputs] = useState<MediaDeviceInfo[]>([]);
   const [selectedInputId, setSelectedInputId] = useState<string>("");
   const [selectedOutputId, setSelectedOutputId] = useState<string>("");
+  const [isVRMLoaded, setIsVRMLoaded] = useState(false);
   const mediaRecorderRef = useRef<MediaRecorder | null>(null);
   const audioChunksRef = useRef<Blob[]>([]);
   const audioRef = useRef<HTMLAudioElement | null>(null);
@@ -155,6 +156,9 @@ const AvatarPage = () => {
         const arrayBuffer = await file.arrayBuffer();
         if (vrmViewerRef.current) {
           await vrmViewerRef.current.loadVRM(arrayBuffer);
+          setIsVRMLoaded(true); // Mark VRM as loaded
+          // Reset file input after successful upload
+          event.target.value = "";
         }
       } catch (error) {
         console.error("Failed to load VRM file:", error);
@@ -212,8 +216,23 @@ const AvatarPage = () => {
     };
   }, [selectedInputId, selectedOutputId]);
 
+  // Check if VRM is loaded by polling
+  useEffect(() => {
+    const checkInterval = setInterval(() => {
+      if (vrmViewerRef.current && !isVRMLoaded) {
+        setIsVRMLoaded(true);
+        clearInterval(checkInterval);
+      }
+    }, 100);
+
+    return () => clearInterval(checkInterval);
+  }, [isVRMLoaded]);
+
   // Periodic blink idle animation
   useEffect(() => {
+    // Don't start blinking until VRM is loaded
+    if (!isVRMLoaded) return;
+
     const triggerBlink = () => {
       if (!vrmViewerRef.current) return;
 
@@ -268,7 +287,7 @@ const AvatarPage = () => {
         clearTimeout(blinkIntervalRef.current);
       }
     };
-  }, []);
+  }, [isVRMLoaded]);
 
   return (
     <div className="flex flex-col flex-1 h-screen relative overflow-hidden">

@@ -2,7 +2,7 @@ import { useEffect, useRef, forwardRef, useImperativeHandle } from "react";
 import * as THREE from "three";
 import { GLTFLoader, GLTF } from "three/addons/loaders/GLTFLoader.js";
 import { OrbitControls } from "three/addons/controls/OrbitControls.js";
-import { VRMLoaderPlugin, VRMUtils } from "@pixiv/three-vrm";
+import { VRMLoaderPlugin } from "@pixiv/three-vrm";
 import type { VRM } from "@pixiv/three-vrm";
 
 export interface VRMViewerRef {
@@ -29,18 +29,76 @@ export const VRMViewer = forwardRef<VRMViewerRef>((_, ref) => {
           return;
         }
 
-        // Remove previous VRM if exists
-        if (vrmRef.current) {
-          sceneRef.current.remove(vrmRef.current.scene);
-          vrmRef.current = null;
-        }
+        // Clear the scene - remove all children except lights and helpers
+        const childrenToRemove = sceneRef.current.children.filter(
+          (child) =>
+            !(child instanceof THREE.Light) &&
+            !(child instanceof THREE.GridHelper) &&
+            !(child instanceof THREE.AxesHelper)
+        );
+
+        childrenToRemove.forEach((child) => {
+          sceneRef.current?.remove(child);
+
+          // Dispose the VRM model completely - including all textures
+          child.traverse((obj: THREE.Object3D) => {
+            if (obj instanceof THREE.Mesh) {
+              if (obj.geometry) obj.geometry.dispose();
+              if (obj.material) {
+                if (Array.isArray(obj.material)) {
+                  obj.material.forEach((mat: THREE.Material) => {
+                    // Dispose all texture properties
+                    const matWithTextures = mat as THREE.MeshStandardMaterial;
+                    if (matWithTextures.map) matWithTextures.map.dispose();
+                    if (matWithTextures.normalMap)
+                      matWithTextures.normalMap.dispose();
+                    if (matWithTextures.roughnessMap)
+                      matWithTextures.roughnessMap.dispose();
+                    if (matWithTextures.metalnessMap)
+                      matWithTextures.metalnessMap.dispose();
+                    if (matWithTextures.emissiveMap)
+                      matWithTextures.emissiveMap.dispose();
+                    if (matWithTextures.aoMap) matWithTextures.aoMap.dispose();
+                    if (matWithTextures.lightMap)
+                      matWithTextures.lightMap.dispose();
+                    if (matWithTextures.alphaMap)
+                      matWithTextures.alphaMap.dispose();
+                    // Dispose material
+                    mat.dispose();
+                  });
+                } else {
+                  const mat = obj.material as THREE.MeshStandardMaterial;
+                  // Dispose all texture properties
+                  if (mat.map) mat.map.dispose();
+                  if (mat.normalMap) mat.normalMap.dispose();
+                  if (mat.roughnessMap) mat.roughnessMap.dispose();
+                  if (mat.metalnessMap) mat.metalnessMap.dispose();
+                  if (mat.emissiveMap) mat.emissiveMap.dispose();
+                  if (mat.aoMap) mat.aoMap.dispose();
+                  if (mat.lightMap) mat.lightMap.dispose();
+                  if (mat.alphaMap) mat.alphaMap.dispose();
+                  // Dispose material
+                  mat.dispose();
+                }
+              }
+            }
+          });
+        });
+
+        vrmRef.current = null;
 
         if (typeof arrayBufferOrUrl === "string") {
           // Load from URL (for public assets)
           loaderRef.current.load(
             arrayBufferOrUrl,
             handleVRMLoad,
-            undefined,
+            (progress) => {
+              console.log(
+                "Loading model...",
+                100.0 * (progress.loaded / progress.total),
+                "%"
+              );
+            },
             (error) => {
               console.error("Error loading VRM from URL:", error);
               reject(error);
@@ -48,11 +106,33 @@ export const VRMViewer = forwardRef<VRMViewerRef>((_, ref) => {
           );
         } else {
           // Parse from ArrayBuffer (for uploaded files)
-          loaderRef.current.parse(
-            arrayBufferOrUrl,
-            "",
-            handleVRMLoad,
+          // Create a fresh loader instance to avoid caching issues
+          const freshLoader = new GLTFLoader();
+          freshLoader.register((parser) => {
+            return new VRMLoaderPlugin(parser);
+          });
+
+          // Create a proper Blob from ArrayBuffer
+          const blob = new Blob([new Uint8Array(arrayBufferOrUrl)], {
+            type: "application/octet-stream",
+          });
+          const blobUrl = URL.createObjectURL(blob);
+
+          freshLoader.load(
+            blobUrl,
+            (gltf) => {
+              URL.revokeObjectURL(blobUrl);
+              handleVRMLoad(gltf);
+            },
+            (progress) => {
+              console.log(
+                "Loading uploaded model...",
+                100.0 * (progress.loaded / progress.total),
+                "%"
+              );
+            },
             (error) => {
+              URL.revokeObjectURL(blobUrl);
               console.error("Error loading VRM from buffer:", error);
               reject(error);
             }
@@ -61,9 +141,6 @@ export const VRMViewer = forwardRef<VRMViewerRef>((_, ref) => {
 
         function handleVRMLoad(gltf: GLTF) {
           const vrm = gltf.userData.vrm as VRM;
-
-          VRMUtils.removeUnnecessaryVertices(gltf.scene);
-          VRMUtils.combineSkeletons(gltf.scene);
 
           vrm.scene.traverse((obj: THREE.Object3D) => {
             obj.frustumCulled = false;
@@ -81,6 +158,26 @@ export const VRMViewer = forwardRef<VRMViewerRef>((_, ref) => {
             }
           }
 
+          // Set A-pose by rotating arms downward
+          if (vrm.humanoid) {
+            const leftUpperArm =
+              vrm.humanoid.getNormalizedBoneNode("leftUpperArm");
+            const rightUpperArm =
+              vrm.humanoid.getNormalizedBoneNode("rightUpperArm");
+
+            // Rotate arms down about 30 degrees (0.52 radians) for A-pose
+            if (leftUpperArm) {
+              leftUpperArm.rotation.z = -0.52; // Left arm down
+            }
+            if (rightUpperArm) {
+              rightUpperArm.rotation.z = 0.52; // Right arm down
+            }
+          }
+
+          console.log(
+            "Available Expressions:",
+            vrm.expressionManager?.expressionMap
+          );
           console.log("VRM model loaded!", vrm);
           resolve();
         }
@@ -143,24 +240,46 @@ export const VRMViewer = forwardRef<VRMViewerRef>((_, ref) => {
     loaderRef.current = loader;
 
     // Load default VRM model
-    const modelUrl = "/HatsuneMikuNT.vrm";
+    const modelUrl = "/Larasdyah.vrm";
     loader.load(
       modelUrl,
       (gltf) => {
         const vrm = gltf.userData.vrm;
 
-        VRMUtils.removeUnnecessaryVertices(gltf.scene);
-        VRMUtils.combineSkeletons(gltf.scene);
-
         vrm.scene.traverse((obj: THREE.Object3D) => {
           obj.frustumCulled = false;
         });
+
+        // Reset all expressions to 0
+        if (vrm.expressionManager) {
+          for (const expName of Object.keys(
+            vrm.expressionManager.expressionMap
+          )) {
+            vrm.expressionManager.setValue(expName, 0);
+          }
+        }
+
+        // Set A-pose by rotating arms downward
+        if (vrm.humanoid) {
+          const leftUpperArm =
+            vrm.humanoid.getNormalizedBoneNode("leftUpperArm");
+          const rightUpperArm =
+            vrm.humanoid.getNormalizedBoneNode("rightUpperArm");
+
+          // Rotate arms down about 30 degrees (0.52 radians) for A-pose
+          if (leftUpperArm) {
+            leftUpperArm.rotation.z = -0.52; // Left arm down
+          }
+          if (rightUpperArm) {
+            rightUpperArm.rotation.z = 0.52; // Right arm down
+          }
+        }
 
         scene.add(vrm.scene);
         vrmRef.current = vrm;
       },
       undefined,
-      (error) => console.error(error)
+      (error) => console.error("Error loading default VRM model:", error)
     );
 
     // Add helpers for development
