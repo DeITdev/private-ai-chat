@@ -24,20 +24,31 @@ export const VRMViewer = forwardRef<VRMViewerRef>((_, ref) => {
   useEffect(() => {
     if (!canvasRef.current) return;
 
+    const container = canvasRef.current.parentElement;
+    if (!container) return;
+
+    // Get container dimensions
+    const getContainerSize = () => ({
+      width: container.clientWidth,
+      height: container.clientHeight,
+    });
+
+    const { width, height } = getContainerSize();
+
     // Setup renderer
     const renderer = new THREE.WebGLRenderer({
       canvas: canvasRef.current,
       alpha: true,
       antialias: true,
     });
-    renderer.setSize(window.innerWidth, window.innerHeight);
+    renderer.setSize(width, height);
     renderer.setPixelRatio(window.devicePixelRatio);
     renderer.outputColorSpace = THREE.SRGBColorSpace;
 
     // Setup camera
     const camera = new THREE.PerspectiveCamera(
       30.0,
-      window.innerWidth / window.innerHeight,
+      width / height,
       0.1,
       20.0
     );
@@ -124,9 +135,10 @@ export const VRMViewer = forwardRef<VRMViewerRef>((_, ref) => {
 
     // Handle window resize
     const handleResize = () => {
-      camera.aspect = window.innerWidth / window.innerHeight;
+      const { width, height } = getContainerSize();
+      camera.aspect = width / height;
       camera.updateProjectionMatrix();
-      renderer.setSize(window.innerWidth, window.innerHeight);
+      renderer.setSize(width, height);
     };
     window.addEventListener("resize", handleResize);
 

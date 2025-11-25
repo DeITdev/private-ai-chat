@@ -112,17 +112,41 @@ const AvatarPage = () => {
   // Periodic blink idle animation
   useEffect(() => {
     const triggerBlink = () => {
-      if (vrmViewerRef.current) {
-        // Blink: close eyes quickly
-        vrmViewerRef.current.setExpression("blink", 1.0);
+      if (!vrmViewerRef.current) return;
 
-        // Open eyes after 150ms
-        setTimeout(() => {
-          if (vrmViewerRef.current) {
-            vrmViewerRef.current.setExpression("blink", 0);
-          }
-        }, 150);
-      }
+      // Smooth blink animation with transitions
+      const transitionDuration = 100; // 0.1 seconds
+      const steps = 10;
+      const stepDelay = transitionDuration / steps;
+
+      // Close eyes (0 -> 1)
+      let currentStep = 0;
+      const closeInterval = setInterval(() => {
+        currentStep++;
+        const value = currentStep / steps;
+        if (vrmViewerRef.current) {
+          vrmViewerRef.current.setExpression("blink", value);
+        }
+        if (currentStep >= steps) {
+          clearInterval(closeInterval);
+          
+          // Keep eyes closed briefly
+          setTimeout(() => {
+            // Open eyes (1 -> 0)
+            let openStep = steps;
+            const openInterval = setInterval(() => {
+              openStep--;
+              const value = openStep / steps;
+              if (vrmViewerRef.current) {
+                vrmViewerRef.current.setExpression("blink", value);
+              }
+              if (openStep <= 0) {
+                clearInterval(openInterval);
+              }
+            }, stepDelay);
+          }, 50);
+        }
+      }, stepDelay);
     };
 
     // Random blink interval between 2-4 seconds
@@ -144,11 +168,11 @@ const AvatarPage = () => {
   }, []);
 
   return (
-    <div className="flex flex-col flex-1 h-screen relative">
+    <div className="flex flex-col flex-1 h-screen relative overflow-hidden">
       <header className="absolute top-0 left-0 right-0 flex items-center px-4 h-16 border-b bg-background/80 backdrop-blur-sm z-10">
         <h1 className="text-xl font-bold ml-4">3D Avatar Viewer</h1>
       </header>
-      <main className="flex-1 w-full h-full">
+      <main className="flex-1 w-full h-full overflow-hidden">
         <VRMViewer ref={vrmViewerRef} />
       </main>
       <footer className="absolute bottom-0 left-0 right-0 border-t p-4 bg-background/80 backdrop-blur-sm z-10">
