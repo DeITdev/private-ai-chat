@@ -1,4 +1,4 @@
-import { Moon, Plus, Sun } from "lucide-react";
+import { Moon, Plus, Sun, User } from "lucide-react";
 import { useLayoutEffect, useState } from "react";
 import { Button } from "~/components/ui/button";
 import {
@@ -25,16 +25,18 @@ import { Label } from "./ui/label";
 import { Input } from "./ui/input";
 import { db } from "~/lib/dexie";
 import { useLiveQuery } from "dexie-react-hooks";
-import { Link, useLocation } from "react-router-dom";
+import { Link, useLocation, useNavigate } from "react-router-dom";
 
 export const ChatSidebar = () => {
   const [activeThread, setActiveThread] = useState("");
   const [dialogIsOpen, setDialogIsOpen] = useState(false);
   const [textInput, setTextInput] = useState("");
+  const [viewMode, setViewMode] = useState<"chat" | "avatar">("chat");
 
   const { setTheme, theme } = useTheme();
 
   const location = useLocation();
+  const navigate = useNavigate();
 
   const threads = useLiveQuery(() => db.getAllThreads(), []);
 
@@ -43,6 +45,23 @@ export const ChatSidebar = () => {
       setTheme("light");
     } else {
       setTheme("dark");
+    }
+  };
+
+  const handleToggleViewMode = () => {
+    const newMode = viewMode === "chat" ? "avatar" : "chat";
+    setViewMode(newMode);
+
+    // Navigate to avatar route or back to thread
+    if (newMode === "avatar") {
+      navigate("/avatar");
+    } else {
+      // Navigate back to the active thread or first thread
+      if (activeThread) {
+        navigate(`/thread/${activeThread}`);
+      } else if (threads && threads.length > 0) {
+        navigate(`/thread/${threads[0].id}`);
+      }
     }
   };
 
@@ -56,6 +75,13 @@ export const ChatSidebar = () => {
   useLayoutEffect(() => {
     const activeThreadId = location.pathname.split("/")[2];
     setActiveThread(activeThreadId);
+
+    // Update view mode based on current route
+    if (location.pathname === "/avatar") {
+      setViewMode("avatar");
+    } else {
+      setViewMode("chat");
+    }
   }, [location.pathname]);
 
   return (
@@ -116,6 +142,14 @@ export const ChatSidebar = () => {
           </SidebarGroup>
         </SidebarContent>
         <SidebarFooter>
+          <Button
+            onClick={handleToggleViewMode}
+            variant="ghost"
+            className="w-full justify-start"
+          >
+            <User className="h-[1.2rem] w-[1.2rem] mr-2" />
+            {viewMode === "chat" ? "Show Avatar" : "Show Chat"}
+          </Button>
           <Button
             onClick={handleToggleTheme}
             variant="ghost"

@@ -3,6 +3,7 @@ import { ChatSidebar } from "~/components/ChatSidebar";
 import { SidebarProvider } from "~/components/ui/sidebar";
 import { Route, Routes } from "react-router-dom";
 import ChatPage from "./pages/ChatPage";
+import AvatarPage from "./pages/AvatarPage";
 
 export default function App() {
   const [sidebarOpen, setSidebarOpen] = useState(true);
@@ -13,6 +14,7 @@ export default function App() {
         <ChatSidebar />
         <Routes>
           <Route path="/thread/:threadId" element={<ChatPage />} />
+          <Route path="/avatar" element={<AvatarPage />} />
         </Routes>
       </div>
     </SidebarProvider>
