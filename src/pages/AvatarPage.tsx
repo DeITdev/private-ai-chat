@@ -129,7 +129,7 @@ const AvatarPage = () => {
         }
         if (currentStep >= steps) {
           clearInterval(closeInterval);
-          
+
           // Keep eyes closed briefly
           setTimeout(() => {
             // Open eyes (1 -> 0)

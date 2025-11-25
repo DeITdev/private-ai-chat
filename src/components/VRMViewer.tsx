@@ -46,12 +46,7 @@ export const VRMViewer = forwardRef<VRMViewerRef>((_, ref) => {
     renderer.outputColorSpace = THREE.SRGBColorSpace;
 
     // Setup camera
-    const camera = new THREE.PerspectiveCamera(
-      30.0,
-      width / height,
-      0.1,
-      20.0
-    );
+    const camera = new THREE.PerspectiveCamera(30.0, width / height, 0.1, 20.0);
     camera.position.set(0.0, 1.0, 5.0);
 
     // Setup controls
