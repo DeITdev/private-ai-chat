@@ -1,10 +1,32 @@
 import { useState, useRef, useEffect } from "react";
 import { VRMViewer, VRMViewerRef } from "~/components/VRMViewer";
-import { Mic, AudioWaveform } from "lucide-react";
+import {
+  Mic,
+  AudioWaveform,
+  ChevronDown,
+  Settings as SettingsIcon,
+  Upload,
+} from "lucide-react";
 import { Button } from "~/components/ui/button";
+import { Textarea } from "~/components/ui/textarea";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuLabel,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+  DropdownMenuRadioGroup,
+  DropdownMenuRadioItem,
+} from "~/components/ui/dropdown-menu";
 
 const AvatarPage = () => {
   const [isRecording, setIsRecording] = useState(false);
+  const [currentMode, setCurrentMode] = useState<"voice" | "chat">("voice");
+  const [messageInput, setMessageInput] = useState("");
+  const [audioInputs, setAudioInputs] = useState<MediaDeviceInfo[]>([]);
+  const [audioOutputs, setAudioOutputs] = useState<MediaDeviceInfo[]>([]);
+  const [selectedInputId, setSelectedInputId] = useState<string>("");
+  const [selectedOutputId, setSelectedOutputId] = useState<string>("");
   const mediaRecorderRef = useRef<MediaRecorder | null>(null);
   const audioChunksRef = useRef<Blob[]>([]);
   const audioRef = useRef<HTMLAudioElement | null>(null);
@@ -12,10 +34,17 @@ const AvatarPage = () => {
   const analyserRef = useRef<AnalyserNode | null>(null);
   const animationFrameRef = useRef<number | null>(null);
   const blinkIntervalRef = useRef<NodeJS.Timeout | null>(null);
+  const fileInputRef = useRef<HTMLInputElement | null>(null);
 
   const startRecording = async () => {
     try {
-      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+      const audioConstraints = selectedInputId
+        ? { deviceId: { exact: selectedInputId } }
+        : true;
+
+      const stream = await navigator.mediaDevices.getUserMedia({
+        audio: audioConstraints,
+      });
       const mediaRecorder = new MediaRecorder(stream);
       mediaRecorderRef.current = mediaRecorder;
       audioChunksRef.current = [];
@@ -43,8 +72,6 @@ const AvatarPage = () => {
         // Map volume to aa expression (0.0 - 1.0)
         // Normalize and apply threshold - adjusted sensitivity
         const mouthValue = Math.min(Math.max((average - 5) / 50, 0), 1);
-
-        console.log("Voice volume:", average, "Mouth value:", mouthValue);
 
         if (vrmViewerRef.current) {
           vrmViewerRef.current.setExpression("aa", mouthValue);
@@ -79,6 +106,11 @@ const AvatarPage = () => {
         // Play the recorded audio
         if (audioRef.current) {
           audioRef.current.src = url;
+          if (selectedOutputId) {
+            audioRef.current.setSinkId(selectedOutputId).catch((error) => {
+              console.error("Error setting audio output:", error);
+            });
+          }
           audioRef.current.play();
         }
 
@@ -108,6 +140,77 @@ const AvatarPage = () => {
       startRecording();
     }
   };
+
+  const handleUploadModel = () => {
+    fileInputRef.current?.click();
+  };
+
+  const handleFileSelected = async (
+    event: React.ChangeEvent<HTMLInputElement>
+  ) => {
+    const file = event.target.files?.[0];
+    if (file && file.name.endsWith(".vrm")) {
+      try {
+        // Read file as ArrayBuffer
+        const arrayBuffer = await file.arrayBuffer();
+        if (vrmViewerRef.current) {
+          await vrmViewerRef.current.loadVRM(arrayBuffer);
+        }
+      } catch (error) {
+        console.error("Failed to load VRM file:", error);
+        alert(
+          "Failed to load VRM file. Please make sure it's a valid VRM model."
+        );
+      }
+    } else {
+      alert("Please select a valid VRM file");
+    }
+  };
+
+  const handleSwitchMode = (newMode: "voice" | "chat") => {
+    setCurrentMode(newMode);
+  };
+
+  const handleChatSubmit = () => {
+    if (!messageInput.trim()) return;
+    // TODO: Implement chat submission with avatar
+    setMessageInput("");
+  };
+
+  // Enumerate audio devices
+  useEffect(() => {
+    const enumerateDevices = async () => {
+      try {
+        const devices = await navigator.mediaDevices.enumerateDevices();
+        const inputs = devices.filter((device) => device.kind === "audioinput");
+        const outputs = devices.filter(
+          (device) => device.kind === "audiooutput"
+        );
+
+        setAudioInputs(inputs);
+        setAudioOutputs(outputs);
+
+        if (inputs.length > 0 && !selectedInputId) {
+          setSelectedInputId(inputs[0].deviceId);
+        }
+        if (outputs.length > 0 && !selectedOutputId) {
+          setSelectedOutputId(outputs[0].deviceId);
+        }
+      } catch (error) {
+        console.error("Error enumerating devices:", error);
+      }
+    };
+
+    enumerateDevices();
+
+    navigator.mediaDevices.addEventListener("devicechange", enumerateDevices);
+    return () => {
+      navigator.mediaDevices.removeEventListener(
+        "devicechange",
+        enumerateDevices
+      );
+    };
+  }, [selectedInputId, selectedOutputId]);
 
   // Periodic blink idle animation
   useEffect(() => {
@@ -169,32 +272,184 @@ const AvatarPage = () => {
 
   return (
     <div className="flex flex-col flex-1 h-screen relative overflow-hidden">
-      <header className="absolute top-0 left-0 right-0 flex items-center px-4 h-16 border-b bg-background/80 backdrop-blur-sm z-10">
-        <h1 className="text-xl font-bold ml-4">3D Avatar Viewer</h1>
+      <header className="absolute top-0 left-0 right-0 flex items-center justify-between px-4 h-16 border-b bg-background/80 backdrop-blur-sm z-10">
+        <h1 className="text-xl font-bold">3D Avatar Viewer</h1>
+
+        {/* Settings Dropdown */}
+        <DropdownMenu>
+          <DropdownMenuTrigger asChild>
+            <Button
+              variant="outline"
+              size="sm"
+              className="text-base font-semibold"
+            >
+              Settings
+              <SettingsIcon className="ml-2 h-4 w-4" />
+            </Button>
+          </DropdownMenuTrigger>
+          <DropdownMenuContent align="end" className="w-56">
+            {/* Upload 3D Model */}
+            <DropdownMenuRadioItem
+              value="upload"
+              onClick={(e) => {
+                e.preventDefault();
+                handleUploadModel();
+              }}
+              className="flex flex-col items-center justify-center py-6 cursor-pointer hover:bg-accent"
+            >
+              <Upload className="h-8 w-8 mb-2" />
+              <span className="text-sm font-medium">Upload 3D Model (VRM)</span>
+            </DropdownMenuRadioItem>
+
+            <DropdownMenuSeparator />
+
+            {/* Mode Switch - Chat Mode */}
+            {currentMode === "voice" && (
+              <DropdownMenuRadioItem
+                value="chat-mode"
+                onClick={(e) => {
+                  e.preventDefault();
+                  handleSwitchMode("chat");
+                }}
+                className="cursor-pointer"
+              >
+                Switch to Chat Mode
+              </DropdownMenuRadioItem>
+            )}
+
+            {/* Mode Switch - Voice Mode */}
+            {currentMode === "chat" && (
+              <DropdownMenuRadioItem
+                value="voice-mode"
+                onClick={(e) => {
+                  e.preventDefault();
+                  handleSwitchMode("voice");
+                }}
+                className="cursor-pointer"
+              >
+                Switch to Voice Mode
+              </DropdownMenuRadioItem>
+            )}
+          </DropdownMenuContent>
+        </DropdownMenu>
       </header>
       <main className="flex-1 w-full h-full overflow-hidden">
         <VRMViewer ref={vrmViewerRef} />
       </main>
-      <footer className="absolute bottom-0 left-0 right-0 border-t p-4 bg-background/80 backdrop-blur-sm z-10">
-        <div className="max-w-3xl mx-auto flex justify-center items-center">
-          <Button
-            onClick={handleToggleRecording}
-            className={`h-20 w-20 rounded-full transition-all ${
-              isRecording
-                ? "bg-red-500 hover:bg-red-600 dark:bg-red-600 dark:hover:bg-red-700"
-                : "bg-primary hover:bg-primary/90"
-            }`}
-            size="icon"
-          >
-            {isRecording ? (
-              <AudioWaveform className="h-10 w-10" />
-            ) : (
-              <Mic className="h-10 w-10" />
-            )}
-          </Button>
-        </div>
+      <footer className="absolute bottom-0 left-0 right-0 p-4 z-10">
+        {currentMode === "voice" && (
+          <div className="max-w-3xl mx-auto flex justify-center items-center gap-4">
+            {/* Speaker Selection Dropdown */}
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  className="text-base font-semibold"
+                >
+                  Speaker
+                  <ChevronDown className="ml-2 h-4 w-4" />
+                </Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end">
+                <DropdownMenuLabel>Select Speaker</DropdownMenuLabel>
+                <DropdownMenuSeparator />
+                <DropdownMenuRadioGroup
+                  value={selectedOutputId}
+                  onValueChange={setSelectedOutputId}
+                >
+                  {audioOutputs.map((device) => (
+                    <DropdownMenuRadioItem
+                      key={device.deviceId}
+                      value={device.deviceId}
+                    >
+                      {device.label ||
+                        `Speaker (${device.deviceId.slice(0, 5)})`}
+                    </DropdownMenuRadioItem>
+                  ))}
+                </DropdownMenuRadioGroup>
+              </DropdownMenuContent>
+            </DropdownMenu>
+
+            {/* Record Button */}
+            <Button
+              onClick={handleToggleRecording}
+              size="unsized"
+              className={`h-20 w-20 rounded-full transition-all ${
+                isRecording
+                  ? "bg-red-500 hover:bg-red-600 dark:bg-red-600 dark:hover:bg-red-700"
+                  : "bg-primary hover:bg-primary/90"
+              }`}
+            >
+              {isRecording ? (
+                <AudioWaveform className="h-12 w-12" />
+              ) : (
+                <Mic className="h-12 w-12" />
+              )}
+            </Button>
+
+            {/* Microphone Selection Dropdown */}
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  className="text-base font-semibold"
+                >
+                  Microphone
+                  <ChevronDown className="ml-2 h-4 w-4" />
+                </Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="start">
+                <DropdownMenuLabel>Select Microphone</DropdownMenuLabel>
+                <DropdownMenuSeparator />
+                <DropdownMenuRadioGroup
+                  value={selectedInputId}
+                  onValueChange={setSelectedInputId}
+                >
+                  {audioInputs.map((device) => (
+                    <DropdownMenuRadioItem
+                      key={device.deviceId}
+                      value={device.deviceId}
+                    >
+                      {device.label ||
+                        `Microphone (${device.deviceId.slice(0, 5)})`}
+                    </DropdownMenuRadioItem>
+                  ))}
+                </DropdownMenuRadioGroup>
+              </DropdownMenuContent>
+            </DropdownMenu>
+          </div>
+        )}
+        {currentMode === "chat" && (
+          <div className="max-w-3xl mx-auto flex gap-2">
+            <Textarea
+              className="flex-1 bg-white dark:bg-slate-900 text-black dark:text-white border-2 border-slate-300 dark:border-slate-600 focus:border-primary dark:focus:border-primary resize-none"
+              placeholder="Type your message to chat with the avatar..."
+              rows={2}
+              value={messageInput}
+              onChange={(e) => setMessageInput(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === "Enter" && !e.shiftKey) {
+                  e.preventDefault();
+                  handleChatSubmit();
+                }
+              }}
+            />
+            <Button onClick={handleChatSubmit} type="button">
+              Send
+            </Button>
+          </div>
+        )}
       </footer>
       <audio ref={audioRef} className="hidden" />
+      <input
+        ref={fileInputRef}
+        type="file"
+        accept=".vrm"
+        onChange={handleFileSelected}
+        className="hidden"
+      />
     </div>
   );
 };

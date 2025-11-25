@@ -1,23 +1,90 @@
 import { useEffect, useRef, forwardRef, useImperativeHandle } from "react";
 import * as THREE from "three";
-import { GLTFLoader } from "three/addons/loaders/GLTFLoader.js";
+import { GLTFLoader, GLTF } from "three/addons/loaders/GLTFLoader.js";
 import { OrbitControls } from "three/addons/controls/OrbitControls.js";
 import { VRMLoaderPlugin, VRMUtils } from "@pixiv/three-vrm";
 import type { VRM } from "@pixiv/three-vrm";
 
 export interface VRMViewerRef {
   setExpression: (name: string, value: number) => void;
+  loadVRM: (arrayBufferOrUrl: ArrayBuffer | string) => Promise<void>;
 }
 
 export const VRMViewer = forwardRef<VRMViewerRef>((_, ref) => {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const vrmRef = useRef<VRM | null>(null);
+  const sceneRef = useRef<THREE.Scene | null>(null);
+  const loaderRef = useRef<GLTFLoader | null>(null);
 
   useImperativeHandle(ref, () => ({
     setExpression: (name: string, value: number) => {
       if (vrmRef.current?.expressionManager) {
         vrmRef.current.expressionManager.setValue(name, value);
       }
+    },
+    loadVRM: async (arrayBufferOrUrl: ArrayBuffer | string) => {
+      return new Promise((resolve, reject) => {
+        if (!loaderRef.current || !sceneRef.current) {
+          reject(new Error("VRM loader not initialized"));
+          return;
+        }
+
+        // Remove previous VRM if exists
+        if (vrmRef.current) {
+          sceneRef.current.remove(vrmRef.current.scene);
+          vrmRef.current = null;
+        }
+
+        if (typeof arrayBufferOrUrl === "string") {
+          // Load from URL (for public assets)
+          loaderRef.current.load(
+            arrayBufferOrUrl,
+            handleVRMLoad,
+            undefined,
+            (error) => {
+              console.error("Error loading VRM from URL:", error);
+              reject(error);
+            }
+          );
+        } else {
+          // Parse from ArrayBuffer (for uploaded files)
+          loaderRef.current.parse(
+            arrayBufferOrUrl,
+            "",
+            handleVRMLoad,
+            (error) => {
+              console.error("Error loading VRM from buffer:", error);
+              reject(error);
+            }
+          );
+        }
+
+        function handleVRMLoad(gltf: GLTF) {
+          const vrm = gltf.userData.vrm as VRM;
+
+          VRMUtils.removeUnnecessaryVertices(gltf.scene);
+          VRMUtils.combineSkeletons(gltf.scene);
+
+          vrm.scene.traverse((obj: THREE.Object3D) => {
+            obj.frustumCulled = false;
+          });
+
+          sceneRef.current?.add(vrm.scene);
+          vrmRef.current = vrm;
+
+          // Reset all expressions to 0
+          if (vrm.expressionManager) {
+            for (const expName of Object.keys(
+              vrm.expressionManager.expressionMap
+            )) {
+              vrm.expressionManager.setValue(expName, 0);
+            }
+          }
+
+          console.log("VRM model loaded!", vrm);
+          resolve();
+        }
+      });
     },
   }));
 
@@ -57,6 +124,7 @@ export const VRMViewer = forwardRef<VRMViewerRef>((_, ref) => {
 
     // Setup scene
     const scene = new THREE.Scene();
+    sceneRef.current = scene;
 
     // Add lighting
     const light = new THREE.DirectionalLight(0xffffff, Math.PI);
@@ -67,14 +135,15 @@ export const VRMViewer = forwardRef<VRMViewerRef>((_, ref) => {
     const ambientLight = new THREE.AmbientLight(0xffffff, 0.5);
     scene.add(ambientLight);
 
-    // Load VRM model
+    // Setup loader
     const loader = new GLTFLoader();
     loader.register((parser) => {
       return new VRMLoaderPlugin(parser);
     });
+    loaderRef.current = loader;
 
+    // Load default VRM model
     const modelUrl = "/HatsuneMikuNT.vrm";
-
     loader.load(
       modelUrl,
       (gltf) => {
@@ -89,19 +158,8 @@ export const VRMViewer = forwardRef<VRMViewerRef>((_, ref) => {
 
         scene.add(vrm.scene);
         vrmRef.current = vrm;
-
-        console.log(
-          "Available Expressions:",
-          vrm.expressionManager?.expressionMap
-        );
-        console.log("VRM model loaded!", vrm);
       },
-      (progress) =>
-        console.log(
-          "Loading model...",
-          100.0 * (progress.loaded / progress.total),
-          "%"
-        ),
+      undefined,
       (error) => console.error(error)
     );
 
