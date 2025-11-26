@@ -88,7 +88,7 @@ const AvatarPage = () => {
         }
       };
 
-      mediaRecorder.onstop = () => {
+      mediaRecorder.onstop = async () => {
         const audioBlob = new Blob(audioChunksRef.current, {
           type: "audio/webm",
         });
@@ -102,6 +102,30 @@ const AvatarPage = () => {
         }
         if (vrmViewerRef.current) {
           vrmViewerRef.current.setExpression("aa", 0);
+        }
+
+        // Send audio to Whisper backend for transcription
+        try {
+          const formData = new FormData();
+          formData.append("audio", audioBlob, "recording.webm");
+
+          console.log("Sending audio to Whisper for transcription...");
+          const response = await fetch("http://localhost:5001/transcribe", {
+            method: "POST",
+            body: formData,
+          });
+
+          if (response.ok) {
+            const data = await response.json();
+            console.log("=== WHISPER TRANSCRIPTION ===");
+            console.log("Text:", data.text);
+            console.log("Language:", data.language);
+            console.log("============================");
+          } else {
+            console.error("Transcription failed:", await response.text());
+          }
+        } catch (error) {
+          console.error("Error sending audio to Whisper:", error);
         }
 
         // Play the recorded audio
