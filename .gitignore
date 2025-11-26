@@ -26,3 +26,20 @@ venv
 
 Larasdyah.vrm
 Evernight.vrm
+
+# RAG / Vector Store
+data/vector_store/
+data/pdfs/*.pdf
+!data/pdfs/README.md
+!data/pdfs/HOW_TO_ADD_PDF.md
+
+# Python cache
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+
+# Sentence Transformers cache
+.cache/
+sentence_transformers/

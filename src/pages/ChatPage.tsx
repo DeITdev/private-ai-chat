@@ -36,15 +36,54 @@ const ChatPage = () => {
 
     const modelName = "mistral:7b";
 
+    // Query RAG system for relevant context
+    console.log("🔍 Querying RAG system for context...");
+    let ragContext = "";
+    try {
+      const ragResponse = await fetch("http://localhost:5003/query", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({ query: userMessage }),
+      });
+
+      if (ragResponse.ok) {
+        const ragData = await ragResponse.json();
+        if (ragData.has_context) {
+          ragContext = ragData.context;
+          console.log(
+            "✅ RAG Context retrieved:",
+            ragData.contexts.length,
+            "chunks"
+          );
+        } else {
+          console.log("ℹ No relevant context found in documents");
+        }
+      } else {
+        console.warn("⚠ RAG server unavailable, continuing without context");
+      }
+    } catch (error) {
+      console.warn("⚠ RAG query failed:", error);
+      console.log("  Continuing without document context...");
+    }
+
     // Get conversation history
     const history = await db.getMessagesForThread(params.threadId as string);
+
+    // Build system prompt with context if available
+    let systemPrompt =
+      "Kamu adalah asisten AI yang membantu. Selalu jawab dalam Bahasa Indonesia yang sopan dan jelas. Berikan jawaban yang SINGKAT dan LANGSUNG KE INTI. Jangan memberikan penjelasan panjang kecuali diminta. Untuk pertanyaan sederhana, jawab dengan 1-2 kalimat saja.";
+
+    if (ragContext) {
+      systemPrompt += `\n\nGunakan informasi berikut sebagai referensi untuk menjawab pertanyaan:\n\n${ragContext}\n\nJawab berdasarkan informasi di atas jika relevan dengan pertanyaan. Jika informasi tidak cukup atau tidak relevan, jawab berdasarkan pengetahuan umum.`;
+    }
 
     // Build messages array with conversation history
     const chatMessages = [
       {
         role: "system" as const,
-        content:
-          "Kamu adalah asisten AI yang membantu. Selalu jawab dalam Bahasa Indonesia yang sopan dan jelas. Berikan jawaban yang SINGKAT dan LANGSUNG KE INTI. Jangan memberikan penjelasan panjang kecuali diminta. Untuk pertanyaan sederhana, jawab dengan 1-2 kalimat saja.",
+        content: systemPrompt,
       },
       ...history.map((msg) => ({
         role: msg.role as "user" | "assistant",

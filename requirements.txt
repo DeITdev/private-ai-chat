@@ -19,3 +19,10 @@ numpy
 scipy
 librosa
 soundfile
+
+# RAG (Retrieval-Augmented Generation)
+chromadb
+sentence-transformers
+PyPDF2
+langchain
+langchain-community

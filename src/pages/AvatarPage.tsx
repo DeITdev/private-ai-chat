@@ -85,15 +85,57 @@ const AvatarPage = () => {
           const transcribedText = whisperData.text;
           console.log("✅ Transcription:", transcribedText);
 
-          // Step 2: Send transcribed text to LLM (mistral:7b)
+          // Step 2: Query RAG system for relevant context
+          console.log("🔍 Querying RAG system for context...");
+          let ragContext = "";
+          try {
+            const ragResponse = await fetch("http://localhost:5003/query", {
+              method: "POST",
+              headers: {
+                "Content-Type": "application/json",
+              },
+              body: JSON.stringify({ query: transcribedText }),
+            });
+
+            if (ragResponse.ok) {
+              const ragData = await ragResponse.json();
+              if (ragData.has_context) {
+                ragContext = ragData.context;
+                console.log(
+                  "✅ RAG Context retrieved:",
+                  ragData.contexts.length,
+                  "chunks"
+                );
+              } else {
+                console.log("ℹ No relevant context found in documents");
+              }
+            } else {
+              console.warn(
+                "⚠ RAG server unavailable, continuing without context"
+              );
+            }
+          } catch (error) {
+            console.warn("⚠ RAG query failed:", error);
+            console.log("  Continuing without document context...");
+          }
+
+          // Step 3: Send transcribed text to LLM (mistral:7b) with RAG context
           console.log("🤖 Sending to LLM for processing...");
+
+          // Build system prompt with context if available
+          let systemPrompt =
+            "Kamu adalah asisten AI yang membantu. Selalu jawab dalam Bahasa Indonesia yang sopan dan jelas. Berikan jawaban yang SINGKAT dan LANGSUNG KE INTI. Jangan memberikan penjelasan panjang kecuali diminta. Untuk pertanyaan sederhana, jawab dengan 1-2 kalimat saja.";
+
+          if (ragContext) {
+            systemPrompt += `\n\nGunakan informasi berikut sebagai referensi untuk menjawab pertanyaan:\n\n${ragContext}\n\nJawab berdasarkan informasi di atas jika relevan dengan pertanyaan. Jika informasi tidak cukup atau tidak relevan, jawab berdasarkan pengetahuan umum.`;
+          }
+
           const stream = await ollama.chat({
             model: "mistral:7b",
             messages: [
               {
                 role: "system",
-                content:
-                  "Kamu adalah asisten AI yang membantu. Selalu jawab dalam Bahasa Indonesia yang sopan dan jelas. Berikan jawaban yang SINGKAT dan LANGSUNG KE INTI. Jangan memberikan penjelasan panjang kecuali diminta. Untuk pertanyaan sederhana, jawab dengan 1-2 kalimat saja.",
+                content: systemPrompt,
               },
               {
                 role: "user",
@@ -111,7 +153,7 @@ const AvatarPage = () => {
           }
           console.log("✅ LLM Response:", fullResponse);
 
-          // Step 3: Send LLM response to TTS server
+          // Step 4: Send LLM response to TTS server
           console.log("🔊 Sending to TTS for speech synthesis...");
           const ttsResponse = await fetch("http://localhost:5002/synthesize", {
             method: "POST",
@@ -129,7 +171,7 @@ const AvatarPage = () => {
           const audioUrl = URL.createObjectURL(ttsAudioBlob);
           console.log("✅ TTS audio generated");
 
-          // Step 4: Play TTS audio and animate mouth
+          // Step 5: Play TTS audio and animate mouth
           if (audioRef.current) {
             audioRef.current.src = audioUrl;
             if (selectedOutputId) {
