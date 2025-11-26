@@ -17,6 +17,7 @@ VECTOR_STORE_PATH = "data/vector_store"
 CHUNK_SIZE = 800
 CHUNK_OVERLAP = 150
 TOP_K_RESULTS = 3
+RELEVANCE_THRESHOLD = 0.5  # Only return results with similarity score above this
 
 # Initialize embedding model (Indonesian-optimized)
 print("Loading embedding model: paraphrase-multilingual-MiniLM-L12-v2...")
@@ -184,7 +185,7 @@ def query_rag():
             n_results=top_k
         )
 
-        # Format results
+        # Format results and filter by relevance threshold
         contexts = []
         if results['documents'] and results['documents'][0]:
             for i, (doc, metadata, distance) in enumerate(zip(
@@ -192,12 +193,16 @@ def query_rag():
                 results['metadatas'][0],
                 results['distances'][0]
             )):
-                contexts.append({
-                    'text': doc,
-                    'source': metadata['filename'],
-                    'chunk_index': metadata['chunk_index'],
-                    'relevance_score': 1 - distance  # Convert distance to similarity
-                })
+                relevance_score = 1 - distance  # Convert distance to similarity
+                
+                # Only include results above relevance threshold
+                if relevance_score >= RELEVANCE_THRESHOLD:
+                    contexts.append({
+                        'text': doc,
+                        'source': metadata['filename'],
+                        'chunk_index': metadata['chunk_index'],
+                        'relevance_score': relevance_score
+                    })
 
         # Combine contexts into a single string for LLM
         context_text = "\n\n".join([
@@ -207,10 +212,12 @@ def query_rag():
 
         print(f"\n=== RAG Query ===")
         print(f"Query: {query}")
-        print(f"Found {len(contexts)} relevant chunks")
+        print(f"Found {len(contexts)} relevant chunks (threshold: {RELEVANCE_THRESHOLD})")
         if contexts:
             print(
                 f"Top source: {contexts[0]['source']} (relevance: {contexts[0]['relevance_score']:.3f})")
+        else:
+            print("No relevant context found - query not related to documents")
         print(f"=================\n")
 
         return jsonify({
