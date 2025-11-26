@@ -205,6 +205,38 @@ const AvatarPage = () => {
     setMessageInput("");
   };
 
+  // Request microphone and speaker permissions on page load
+  useEffect(() => {
+    const requestPermissions = async () => {
+      try {
+        // Request microphone permission
+        await navigator.mediaDevices
+          .getUserMedia({ audio: true })
+          .then((stream) => {
+            // Stop all tracks immediately after getting permission
+            stream.getTracks().forEach((track) => track.stop());
+          });
+        console.log("✓ Microphone permission granted");
+      } catch {
+        console.warn("Microphone permission denied or unavailable");
+      }
+
+      try {
+        // Request speaker permission (if supported)
+        if (navigator.permissions) {
+          const result = await navigator.permissions.query({
+            name: "speaker" as PermissionName,
+          } as PermissionDescriptor);
+          console.log("Speaker permission status:", result.state);
+        }
+      } catch {
+        console.log("Speaker permission query not supported on this browser");
+      }
+    };
+
+    requestPermissions();
+  }, []);
+
   // Enumerate audio devices
   useEffect(() => {
     const enumerateDevices = async () => {

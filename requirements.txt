@@ -1,3 +1,17 @@
-openai-whisper
+# Web Framework
 flask
 flask-cors
+
+# Speech Recognition
+openai-whisper
+
+# Deep Learning & GPU Support
+torch
+torchvision
+torchaudio
+
+# Utilities
+numpy
+scipy
+librosa
+soundfile
