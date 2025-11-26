@@ -33,10 +33,11 @@ const AvatarPage = () => {
   const audioChunksRef = useRef<Blob[]>([]);
   const audioRef = useRef<HTMLAudioElement | null>(null);
   const vrmViewerRef = useRef<VRMViewerRef>(null);
-  const analyserRef = useRef<AnalyserNode | null>(null);
-  const animationFrameRef = useRef<number | null>(null);
   const blinkIntervalRef = useRef<NodeJS.Timeout | null>(null);
   const fileInputRef = useRef<HTMLInputElement | null>(null);
+  const audioContextRef = useRef<AudioContext | null>(null);
+  const analyserRef = useRef<AnalyserNode | null>(null);
+  const isAudioSetupRef = useRef(false);
 
   const startRecording = async () => {
     try {
@@ -51,38 +52,6 @@ const AvatarPage = () => {
       mediaRecorderRef.current = mediaRecorder;
       audioChunksRef.current = [];
 
-      // Setup Web Audio API for voice analysis
-      const audioContext = new AudioContext();
-      const source = audioContext.createMediaStreamSource(stream);
-      const analyser = audioContext.createAnalyser();
-      analyser.fftSize = 256;
-      source.connect(analyser);
-      analyserRef.current = analyser;
-
-      // Start voice-driven mouth animation
-      const dataArray = new Uint8Array(analyser.frequencyBinCount);
-      let isAnimating = true;
-      const animateVoice = () => {
-        if (!isAnimating) return;
-
-        analyser.getByteFrequencyData(dataArray);
-
-        // Calculate average volume (0-255)
-        const sum = dataArray.reduce((a, b) => a + b, 0);
-        const average = sum / dataArray.length;
-
-        // Map volume to aa expression (0.0 - 1.0)
-        // Normalize and apply threshold - adjusted sensitivity
-        const mouthValue = Math.min(Math.max((average - 5) / 50, 0), 1);
-
-        if (vrmViewerRef.current) {
-          vrmViewerRef.current.setExpression("aa", mouthValue);
-        }
-
-        animationFrameRef.current = requestAnimationFrame(animateVoice);
-      };
-      animateVoice();
-
       mediaRecorder.ondataavailable = (event) => {
         if (event.data.size > 0) {
           audioChunksRef.current.push(event.data);
@@ -93,16 +62,6 @@ const AvatarPage = () => {
         const recordedAudioBlob = new Blob(audioChunksRef.current, {
           type: "audio/webm",
         });
-
-        // Stop animation first
-        isAnimating = false;
-        if (animationFrameRef.current) {
-          cancelAnimationFrame(animationFrameRef.current);
-          animationFrameRef.current = null;
-        }
-        if (vrmViewerRef.current) {
-          vrmViewerRef.current.setExpression("aa", 0);
-        }
 
         try {
           // Step 1: Send audio to Whisper for transcription
@@ -134,7 +93,7 @@ const AvatarPage = () => {
               {
                 role: "system",
                 content:
-                  "Anda adalah asisten AI yang membantu. Selalu jawab dalam Bahasa Indonesia yang sopan dan jelas. Berikan penjelasan yang detail dan mudah dipahami.",
+                  "Kamu adalah asisten AI yang membantu. Selalu jawab dalam Bahasa Indonesia yang sopan dan jelas. Berikan jawaban yang SINGKAT dan LANGSUNG KE INTI. Jangan memberikan penjelasan panjang kecuali diminta. Untuk pertanyaan sederhana, jawab dengan 1-2 kalimat saja.",
               },
               {
                 role: "user",
@@ -181,47 +140,58 @@ const AvatarPage = () => {
                 });
             }
 
-            // Setup audio analysis for mouth animation
-            const audioContext = new AudioContext();
-            const audioElement = audioRef.current;
-            const source = audioContext.createMediaElementSource(audioElement);
-            const analyser = audioContext.createAnalyser();
-            analyser.fftSize = 256;
-            source.connect(analyser);
-            analyser.connect(audioContext.destination);
+            // Setup audio analysis for mouth animation (only once)
+            if (!isAudioSetupRef.current && audioRef.current) {
+              const audioContext = new AudioContext();
+              const audioElement = audioRef.current;
+              const source =
+                audioContext.createMediaElementSource(audioElement);
+              const analyser = audioContext.createAnalyser();
+              analyser.fftSize = 256;
+              source.connect(analyser);
+              analyser.connect(audioContext.destination);
+
+              audioContextRef.current = audioContext;
+              analyserRef.current = analyser;
+              isAudioSetupRef.current = true;
+            }
 
             // Animate mouth based on TTS audio
-            const dataArray = new Uint8Array(analyser.frequencyBinCount);
-            let isPlaying = true;
+            if (analyserRef.current) {
+              const dataArray = new Uint8Array(
+                analyserRef.current.frequencyBinCount
+              );
+              let isPlaying = true;
 
-            const animateMouth = () => {
-              if (!isPlaying) return;
+              const animateMouth = () => {
+                if (!isPlaying || !analyserRef.current) return;
 
-              analyser.getByteFrequencyData(dataArray);
-              const sum = dataArray.reduce((a, b) => a + b, 0);
-              const average = sum / dataArray.length;
-              const mouthValue = Math.min(Math.max((average - 5) / 50, 0), 1);
+                analyserRef.current.getByteFrequencyData(dataArray);
+                const sum = dataArray.reduce((a, b) => a + b, 0);
+                const average = sum / dataArray.length;
+                const mouthValue = Math.min(Math.max((average - 5) / 50, 0), 1);
 
-              if (vrmViewerRef.current) {
-                vrmViewerRef.current.setExpression("aa", mouthValue);
-              }
+                if (vrmViewerRef.current) {
+                  vrmViewerRef.current.setExpression("aa", mouthValue);
+                }
 
-              requestAnimationFrame(animateMouth);
-            };
+                requestAnimationFrame(animateMouth);
+              };
 
-            // Start animation when audio plays
-            audioElement.onplay = () => {
-              isPlaying = true;
-              animateMouth();
-            };
+              // Start animation when audio plays
+              audioRef.current.onplay = () => {
+                isPlaying = true;
+                animateMouth();
+              };
 
-            // Stop animation when audio ends
-            audioElement.onended = () => {
-              isPlaying = false;
-              if (vrmViewerRef.current) {
-                vrmViewerRef.current.setExpression("aa", 0);
-              }
-            };
+              // Stop animation when audio ends
+              audioRef.current.onended = () => {
+                isPlaying = false;
+                if (vrmViewerRef.current) {
+                  vrmViewerRef.current.setExpression("aa", 0);
+                }
+              };
+            }
 
             audioRef.current.play();
           }

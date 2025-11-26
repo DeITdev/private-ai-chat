@@ -3,7 +3,6 @@ import { ChatMessage } from "~/components/ChatMessage";
 import { Button } from "~/components/ui/button";
 import { Textarea } from "~/components/ui/textarea";
 import ollama from "ollama";
-import { ThoughtMessage } from "~/components/ThoughtMessage";
 import { db } from "~/lib/dexie";
 import { useParams } from "react-router-dom";
 import { useLiveQuery } from "dexie-react-hooks";
@@ -11,7 +10,6 @@ import { useLiveQuery } from "dexie-react-hooks";
 const ChatPage = () => {
   const [messageInput, setMessageInput] = useState("");
   const [streamedMessage, setStreamedMessage] = useState("");
-  const [streamedThought, setStreamedThought] = useState("");
 
   const scrollToBottomRef = useRef<HTMLDivElement>(null);
 
@@ -25,8 +23,10 @@ const ChatPage = () => {
   const handleSubmit = async () => {
     if (!messageInput.trim()) return;
 
+    const userMessage = messageInput.trim();
+
     await db.createMessage({
-      content: messageInput,
+      content: userMessage,
       role: "user",
       thought: "",
       thread_id: params.threadId as string,
@@ -34,69 +34,38 @@ const ChatPage = () => {
 
     setMessageInput("");
 
-    const modelName = "deepseek-r1:1.5b";
+    const modelName = "mistral:7b";
 
-    // Try with thinking first, fallback to without thinking if unsupported
-    let stream;
-    let supportsThinking = true;
+    // Get conversation history
+    const history = await db.getMessagesForThread(params.threadId as string);
 
-    try {
-      stream = await ollama.chat({
-        model: modelName,
-        messages: [
-          {
-            role: "system",
-            content:
-              "Anda adalah asisten AI yang membantu. Selalu jawab dalam Bahasa Indonesia yang sopan dan jelas. Berikan penjelasan yang detail dan mudah dipahami.",
-          },
-          {
-            role: "user",
-            content: messageInput.trim(),
-          },
-        ],
-        think: true,
-        stream: true,
-      });
-    } catch (error) {
-      // If thinking is not supported, retry without it
-      if (
-        error instanceof Error &&
-        error.message.includes("does not support thinking")
-      ) {
-        console.log(
-          `Model ${modelName} does not support thinking, using standard mode`
-        );
-        supportsThinking = false;
-        stream = await ollama.chat({
-          model: modelName,
-          messages: [
-            {
-              role: "system",
-              content:
-                "Anda adalah asisten AI yang membantu. Selalu jawab dalam Bahasa Indonesia yang sopan dan jelas. Berikan penjelasan yang detail dan mudah dipahami.",
-            },
-            {
-              role: "user",
-              content: messageInput.trim(),
-            },
-          ],
-          stream: true,
-        });
-      } else {
-        throw error;
-      }
-    }
+    // Build messages array with conversation history
+    const chatMessages = [
+      {
+        role: "system" as const,
+        content:
+          "Kamu adalah asisten AI yang membantu. Selalu jawab dalam Bahasa Indonesia yang sopan dan jelas. Berikan jawaban yang SINGKAT dan LANGSUNG KE INTI. Jangan memberikan penjelasan panjang kecuali diminta. Untuk pertanyaan sederhana, jawab dengan 1-2 kalimat saja.",
+      },
+      ...history.map((msg) => ({
+        role: msg.role as "user" | "assistant",
+        content: msg.content,
+      })),
+      {
+        role: "user" as const,
+        content: userMessage,
+      },
+    ];
+
+    // mistral:7b doesn't support thinking, so just use standard mode
+    const stream = await ollama.chat({
+      model: modelName,
+      messages: chatMessages,
+      stream: true,
+    });
 
     let fullContent = "";
-    let fullThought = "";
 
     for await (const part of stream) {
-      // Handle thinking chunks (only if model supports it)
-      if (supportsThinking && part.message.thinking) {
-        fullThought += part.message.thinking;
-        setStreamedThought(fullThought);
-      }
-
       // Handle content chunks
       if (part.message.content) {
         fullContent += part.message.content;
@@ -107,12 +76,11 @@ const ChatPage = () => {
     await db.createMessage({
       content: fullContent,
       role: "assistant",
-      thought: fullThought,
+      thought: "",
       thread_id: params.threadId as string,
     });
 
     setStreamedMessage("");
-    setStreamedThought("");
   };
 
   const handleScrollToBottom = () => {
@@ -121,7 +89,7 @@ const ChatPage = () => {
 
   useLayoutEffect(() => {
     handleScrollToBottom();
-  }, [streamedMessage, streamedThought, messages]);
+  }, [streamedMessage, messages]);
 
   return (
     <div className="flex flex-col flex-1">
@@ -138,8 +106,6 @@ const ChatPage = () => {
               thought={message.thought}
             />
           ))}
-
-          {!!streamedThought && <ThoughtMessage thought={streamedThought} />}
 
           {!!streamedMessage && (
             <ChatMessage role="assistant" content={streamedMessage} />
