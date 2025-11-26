@@ -5,6 +5,10 @@ flask-cors
 # Speech Recognition
 openai-whisper
 
+# Text-to-Speech
+transformers
+accelerate
+
 # Deep Learning & GPU Support
 torch
 torchvision

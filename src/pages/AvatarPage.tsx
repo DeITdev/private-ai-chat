@@ -18,6 +18,7 @@ import {
   DropdownMenuRadioGroup,
   DropdownMenuRadioItem,
 } from "~/components/ui/dropdown-menu";
+import ollama from "ollama";
 
 const AvatarPage = () => {
   const [isRecording, setIsRecording] = useState(false);
@@ -89,10 +90,9 @@ const AvatarPage = () => {
       };
 
       mediaRecorder.onstop = async () => {
-        const audioBlob = new Blob(audioChunksRef.current, {
+        const recordedAudioBlob = new Blob(audioChunksRef.current, {
           type: "audio/webm",
         });
-        const url = URL.createObjectURL(audioBlob);
 
         // Stop animation first
         isAnimating = false;
@@ -104,39 +104,132 @@ const AvatarPage = () => {
           vrmViewerRef.current.setExpression("aa", 0);
         }
 
-        // Send audio to Whisper backend for transcription
         try {
+          // Step 1: Send audio to Whisper for transcription
           const formData = new FormData();
-          formData.append("audio", audioBlob, "recording.webm");
+          formData.append("audio", recordedAudioBlob, "recording.webm");
 
-          console.log("Sending audio to Whisper for transcription...");
-          const response = await fetch("http://localhost:5001/transcribe", {
-            method: "POST",
-            body: formData,
+          console.log("🎤 Sending audio to Whisper for transcription...");
+          const whisperResponse = await fetch(
+            "http://localhost:5001/transcribe",
+            {
+              method: "POST",
+              body: formData,
+            }
+          );
+
+          if (!whisperResponse.ok) {
+            throw new Error("Whisper transcription failed");
+          }
+
+          const whisperData = await whisperResponse.json();
+          const transcribedText = whisperData.text;
+          console.log("✅ Transcription:", transcribedText);
+
+          // Step 2: Send transcribed text to LLM (mistral:7b)
+          console.log("🤖 Sending to LLM for processing...");
+          const stream = await ollama.chat({
+            model: "mistral:7b",
+            messages: [
+              {
+                role: "system",
+                content:
+                  "Anda adalah asisten AI yang membantu. Selalu jawab dalam Bahasa Indonesia yang sopan dan jelas. Berikan penjelasan yang detail dan mudah dipahami.",
+              },
+              {
+                role: "user",
+                content: transcribedText,
+              },
+            ],
+            stream: true,
           });
 
-          if (response.ok) {
-            const data = await response.json();
-            console.log("=== WHISPER TRANSCRIPTION ===");
-            console.log("Text:", data.text);
-            console.log("Language:", data.language);
-            console.log("============================");
-          } else {
-            console.error("Transcription failed:", await response.text());
+          let fullResponse = "";
+          for await (const part of stream) {
+            if (part.message.content) {
+              fullResponse += part.message.content;
+            }
+          }
+          console.log("✅ LLM Response:", fullResponse);
+
+          // Step 3: Send LLM response to TTS server
+          console.log("🔊 Sending to TTS for speech synthesis...");
+          const ttsResponse = await fetch("http://localhost:5002/synthesize", {
+            method: "POST",
+            headers: {
+              "Content-Type": "application/json",
+            },
+            body: JSON.stringify({ text: fullResponse }),
+          });
+
+          if (!ttsResponse.ok) {
+            throw new Error("TTS synthesis failed");
+          }
+
+          const ttsAudioBlob = await ttsResponse.blob();
+          const audioUrl = URL.createObjectURL(ttsAudioBlob);
+          console.log("✅ TTS audio generated");
+
+          // Step 4: Play TTS audio and animate mouth
+          if (audioRef.current) {
+            audioRef.current.src = audioUrl;
+            if (selectedOutputId) {
+              await audioRef.current
+                .setSinkId(selectedOutputId)
+                .catch((error) => {
+                  console.error("Error setting audio output:", error);
+                });
+            }
+
+            // Setup audio analysis for mouth animation
+            const audioContext = new AudioContext();
+            const audioElement = audioRef.current;
+            const source = audioContext.createMediaElementSource(audioElement);
+            const analyser = audioContext.createAnalyser();
+            analyser.fftSize = 256;
+            source.connect(analyser);
+            analyser.connect(audioContext.destination);
+
+            // Animate mouth based on TTS audio
+            const dataArray = new Uint8Array(analyser.frequencyBinCount);
+            let isPlaying = true;
+
+            const animateMouth = () => {
+              if (!isPlaying) return;
+
+              analyser.getByteFrequencyData(dataArray);
+              const sum = dataArray.reduce((a, b) => a + b, 0);
+              const average = sum / dataArray.length;
+              const mouthValue = Math.min(Math.max((average - 5) / 50, 0), 1);
+
+              if (vrmViewerRef.current) {
+                vrmViewerRef.current.setExpression("aa", mouthValue);
+              }
+
+              requestAnimationFrame(animateMouth);
+            };
+
+            // Start animation when audio plays
+            audioElement.onplay = () => {
+              isPlaying = true;
+              animateMouth();
+            };
+
+            // Stop animation when audio ends
+            audioElement.onended = () => {
+              isPlaying = false;
+              if (vrmViewerRef.current) {
+                vrmViewerRef.current.setExpression("aa", 0);
+              }
+            };
+
+            audioRef.current.play();
           }
         } catch (error) {
-          console.error("Error sending audio to Whisper:", error);
-        }
-
-        // Play the recorded audio
-        if (audioRef.current) {
-          audioRef.current.src = url;
-          if (selectedOutputId) {
-            audioRef.current.setSinkId(selectedOutputId).catch((error) => {
-              console.error("Error setting audio output:", error);
-            });
-          }
-          audioRef.current.play();
+          console.error("❌ Error in voice processing pipeline:", error);
+          alert(
+            "Failed to process voice. Please check if all servers are running."
+          );
         }
 
         // Stop all tracks

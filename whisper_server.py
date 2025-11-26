@@ -10,7 +10,7 @@ CORS(app)  # Enable CORS for all routes
 # Load Whisper model (use 'base' for good balance of speed and accuracy)
 print("Loading Whisper model...")
 # You can change "base" to "tiny", "small", "medium", or "large" based on your needs
-model = whisper.load_model("medium")
+model = whisper.load_model("base")
 print("Whisper model loaded successfully!")
 
 

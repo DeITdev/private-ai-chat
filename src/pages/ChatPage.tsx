@@ -34,7 +34,7 @@ const ChatPage = () => {
 
     setMessageInput("");
 
-    const modelName = "mistral:7b";
+    const modelName = "deepseek-r1:1.5b";
 
     // Try with thinking first, fallback to without thinking if unsupported
     let stream;
