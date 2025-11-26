@@ -2,10 +2,10 @@
 flask
 flask-cors
 
-# Speech Recognition
+# Speech Recognition (Whisper)
 openai-whisper
 
-# Text-to-Speech
+# Text-to-Speech (MMS-TTS)
 transformers
 accelerate
 
@@ -14,7 +14,7 @@ torch
 torchvision
 torchaudio
 
-# Utilities
+# Audio Processing
 numpy
 scipy
 librosa
