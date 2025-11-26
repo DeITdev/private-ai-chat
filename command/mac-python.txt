@@ -1,0 +1,11 @@
+# Create a virtual environment named 'venv'
+python3 -m venv venv
+
+# Activate the virtual environment
+source venv/bin/activate
+
+# Install OpenAI Whisper
+pip install openai-whisper
+
+# Install ffmpeg (required dependency)
+brew install ffmpeg
