@@ -12,6 +12,7 @@ dist
 dist-ssr
 *.local
 venv
+r3f-vrm-final
 
 # Editor directories and files
 .vscode/*

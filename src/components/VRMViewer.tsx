@@ -2,12 +2,13 @@ import { useEffect, useRef, forwardRef, useImperativeHandle } from "react";
 import * as THREE from "three";
 import { GLTFLoader, GLTF } from "three/addons/loaders/GLTFLoader.js";
 import { OrbitControls } from "three/addons/controls/OrbitControls.js";
-import { VRMLoaderPlugin } from "@pixiv/three-vrm";
+import { VRMLoaderPlugin, VRMUtils } from "@pixiv/three-vrm";
 import type { VRM } from "@pixiv/three-vrm";
 
 export interface VRMViewerRef {
   setExpression: (name: string, value: number) => void;
   loadVRM: (arrayBufferOrUrl: ArrayBuffer | string) => Promise<void>;
+  clearScene: () => void;
 }
 
 export const VRMViewer = forwardRef<VRMViewerRef>((_, ref) => {
@@ -15,6 +16,10 @@ export const VRMViewer = forwardRef<VRMViewerRef>((_, ref) => {
   const vrmRef = useRef<VRM | null>(null);
   const sceneRef = useRef<THREE.Scene | null>(null);
   const loaderRef = useRef<GLTFLoader | null>(null);
+  const activeBlobUrlsRef = useRef<Set<string>>(new Set());
+  const cameraRef = useRef<THREE.PerspectiveCamera | null>(null);
+  const controlsRef = useRef<OrbitControls | null>(null);
+  const loadingIdRef = useRef<number>(0);
 
   useImperativeHandle(ref, () => ({
     setExpression: (name: string, value: number) => {
@@ -22,11 +27,44 @@ export const VRMViewer = forwardRef<VRMViewerRef>((_, ref) => {
         vrmRef.current.expressionManager.setValue(name, value);
       }
     },
+    clearScene: () => {
+      if (!sceneRef.current) return;
+
+      // Simply remove VRM models from scene (like R3F does on unmount)
+      const childrenToRemove = sceneRef.current.children.filter(
+        (child) =>
+          !(child instanceof THREE.Light) &&
+          !(child instanceof THREE.GridHelper) &&
+          !(child instanceof THREE.AxesHelper)
+      );
+
+      childrenToRemove.forEach((child) => {
+        sceneRef.current?.remove(child);
+      });
+
+      vrmRef.current = null;
+      console.log("✅ Scene cleared (models removed, textures preserved)");
+    },
     loadVRM: async (arrayBufferOrUrl: ArrayBuffer | string) => {
       return new Promise((resolve, reject) => {
         if (!loaderRef.current || !sceneRef.current) {
           reject(new Error("VRM loader not initialized"));
           return;
+        }
+
+        // Increment loading ID to cancel any previous loads
+        loadingIdRef.current += 1;
+        const currentLoadingId = loadingIdRef.current;
+        console.log("🔄 Starting model load #" + currentLoadingId);
+
+        // FIRST: Revoke old blob URLs from previous uploads
+        // This is safe because we're about to clear the old model
+        if (activeBlobUrlsRef.current.size > 0) {
+          console.log("🗑️ Revoking", activeBlobUrlsRef.current.size, "old blob URL(s)...");
+          activeBlobUrlsRef.current.forEach((blobUrl) => {
+            URL.revokeObjectURL(blobUrl);
+          });
+          activeBlobUrlsRef.current.clear();
         }
 
         // Clear the scene - remove all children except lights and helpers
@@ -39,53 +77,18 @@ export const VRMViewer = forwardRef<VRMViewerRef>((_, ref) => {
 
         childrenToRemove.forEach((child) => {
           sceneRef.current?.remove(child);
-
-          // Dispose the VRM model completely - including all textures
-          child.traverse((obj: THREE.Object3D) => {
-            if (obj instanceof THREE.Mesh) {
-              if (obj.geometry) obj.geometry.dispose();
-              if (obj.material) {
-                if (Array.isArray(obj.material)) {
-                  obj.material.forEach((mat: THREE.Material) => {
-                    // Dispose all texture properties
-                    const matWithTextures = mat as THREE.MeshStandardMaterial;
-                    if (matWithTextures.map) matWithTextures.map.dispose();
-                    if (matWithTextures.normalMap)
-                      matWithTextures.normalMap.dispose();
-                    if (matWithTextures.roughnessMap)
-                      matWithTextures.roughnessMap.dispose();
-                    if (matWithTextures.metalnessMap)
-                      matWithTextures.metalnessMap.dispose();
-                    if (matWithTextures.emissiveMap)
-                      matWithTextures.emissiveMap.dispose();
-                    if (matWithTextures.aoMap) matWithTextures.aoMap.dispose();
-                    if (matWithTextures.lightMap)
-                      matWithTextures.lightMap.dispose();
-                    if (matWithTextures.alphaMap)
-                      matWithTextures.alphaMap.dispose();
-                    // Dispose material
-                    mat.dispose();
-                  });
-                } else {
-                  const mat = obj.material as THREE.MeshStandardMaterial;
-                  // Dispose all texture properties
-                  if (mat.map) mat.map.dispose();
-                  if (mat.normalMap) mat.normalMap.dispose();
-                  if (mat.roughnessMap) mat.roughnessMap.dispose();
-                  if (mat.metalnessMap) mat.metalnessMap.dispose();
-                  if (mat.emissiveMap) mat.emissiveMap.dispose();
-                  if (mat.aoMap) mat.aoMap.dispose();
-                  if (mat.lightMap) mat.lightMap.dispose();
-                  if (mat.alphaMap) mat.alphaMap.dispose();
-                  // Dispose material
-                  mat.dispose();
-                }
-              }
-            }
-          });
+          // DO NOT dispose here - textures might still be in use by WebGL
+          // Let the renderer manage texture lifecycle
         });
 
         vrmRef.current = null;
+
+        // If empty string, just clear and resolve
+        if (typeof arrayBufferOrUrl === "string" && arrayBufferOrUrl === "") {
+          console.log("Scene cleared (empty URL provided)");
+          resolve();
+          return;
+        }
 
         if (typeof arrayBufferOrUrl === "string") {
           // Load from URL (for public assets)
@@ -106,24 +109,22 @@ export const VRMViewer = forwardRef<VRMViewerRef>((_, ref) => {
           );
         } else {
           // Parse from ArrayBuffer (for uploaded files)
-          // Create a fresh loader instance to avoid caching issues
-          const freshLoader = new GLTFLoader();
-          freshLoader.register((parser) => {
-            return new VRMLoaderPlugin(parser);
-          });
-
-          // Create a proper Blob from ArrayBuffer
-          const blob = new Blob([new Uint8Array(arrayBufferOrUrl)], {
-            type: "application/octet-stream",
+          console.log("Loading VRM from ArrayBuffer...");
+          
+          // Create blob URL and track it
+          // WebGL needs continuous access to textures during model lifetime
+          const blob = new Blob([arrayBufferOrUrl], {
+            type: "model/gltf-binary",
           });
           const blobUrl = URL.createObjectURL(blob);
+          
+          // Track this blob URL for later cleanup
+          activeBlobUrlsRef.current.add(blobUrl);
+          console.log("Created and tracked blob URL:", blobUrl.substring(0, 50) + "...");
 
-          freshLoader.load(
+          loaderRef.current.load(
             blobUrl,
-            (gltf) => {
-              URL.revokeObjectURL(blobUrl);
-              handleVRMLoad(gltf);
-            },
+            handleVRMLoad,
             (progress) => {
               console.log(
                 "Loading uploaded model...",
@@ -132,7 +133,6 @@ export const VRMViewer = forwardRef<VRMViewerRef>((_, ref) => {
               );
             },
             (error) => {
-              URL.revokeObjectURL(blobUrl);
               console.error("Error loading VRM from buffer:", error);
               reject(error);
             }
@@ -140,7 +140,19 @@ export const VRMViewer = forwardRef<VRMViewerRef>((_, ref) => {
         }
 
         function handleVRMLoad(gltf: GLTF) {
+          // Check if this load is still current
+          if (currentLoadingId !== loadingIdRef.current) {
+            console.log("⚠️ Ignoring outdated model load #" + currentLoadingId + " (current: #" + loadingIdRef.current + ")");
+            reject(new Error("Model load cancelled - newer load started"));
+            return;
+          }
+
           const vrm = gltf.userData.vrm as VRM;
+
+          // Optimize VRM model (from reference project)
+          console.log("🔧 Optimizing VRM model...");
+          VRMUtils.removeUnnecessaryVertices(gltf.scene);
+          VRMUtils.removeUnnecessaryJoints(gltf.scene);
 
           vrm.scene.traverse((obj: THREE.Object3D) => {
             obj.frustumCulled = false;
@@ -149,28 +161,44 @@ export const VRMViewer = forwardRef<VRMViewerRef>((_, ref) => {
           sceneRef.current?.add(vrm.scene);
           vrmRef.current = vrm;
 
+          // Auto-adjust camera to fit the model
+          if (cameraRef.current && controlsRef.current) {
+            // Calculate bounding box of the model
+            const box = new THREE.Box3().setFromObject(vrm.scene);
+            const size = box.getSize(new THREE.Vector3());
+            const center = box.getCenter(new THREE.Vector3());
+            
+            // Calculate optimal camera distance
+            const maxDim = Math.max(size.x, size.y, size.z);
+            const fov = cameraRef.current.fov * (Math.PI / 180);
+            let cameraDistance = Math.abs(maxDim / Math.sin(fov / 2));
+            cameraDistance *= 1.5; // Add some padding
+            
+            // Position camera to look at model center
+            const cameraHeight = center.y;
+            cameraRef.current.position.set(
+              center.x,
+              cameraHeight,
+              center.z + cameraDistance
+            );
+            
+            // Update controls target to model center
+            controlsRef.current.target.copy(center);
+            controlsRef.current.update();
+            
+            console.log("📐 Model bounds:", {
+              size: { x: size.x.toFixed(2), y: size.y.toFixed(2), z: size.z.toFixed(2) },
+              center: { x: center.x.toFixed(2), y: center.y.toFixed(2), z: center.z.toFixed(2) },
+              cameraDistance: cameraDistance.toFixed(2)
+            });
+          }
+
           // Reset all expressions to 0
           if (vrm.expressionManager) {
             for (const expName of Object.keys(
               vrm.expressionManager.expressionMap
             )) {
               vrm.expressionManager.setValue(expName, 0);
-            }
-          }
-
-          // Set A-pose by rotating arms downward
-          if (vrm.humanoid) {
-            const leftUpperArm =
-              vrm.humanoid.getNormalizedBoneNode("leftUpperArm");
-            const rightUpperArm =
-              vrm.humanoid.getNormalizedBoneNode("rightUpperArm");
-
-            // Rotate arms down about 30 degrees (0.52 radians) for A-pose
-            if (leftUpperArm) {
-              leftUpperArm.rotation.z = -0.52; // Left arm down
-            }
-            if (rightUpperArm) {
-              rightUpperArm.rotation.z = 0.52; // Right arm down
             }
           }
 
@@ -190,6 +218,9 @@ export const VRMViewer = forwardRef<VRMViewerRef>((_, ref) => {
 
     const container = canvasRef.current.parentElement;
     if (!container) return;
+    
+    // Capture blob URLs set for cleanup
+    const blobUrlsToCleanup = activeBlobUrlsRef.current;
 
     // Get container dimensions
     const getContainerSize = () => ({
@@ -212,12 +243,14 @@ export const VRMViewer = forwardRef<VRMViewerRef>((_, ref) => {
     // Setup camera
     const camera = new THREE.PerspectiveCamera(30.0, width / height, 0.1, 20.0);
     camera.position.set(0.0, 1.0, 5.0);
+    cameraRef.current = camera;
 
     // Setup controls
     const controls = new OrbitControls(camera, renderer.domElement);
     controls.screenSpacePanning = true;
     controls.target.set(0.0, 1.0, 0.0);
     controls.update();
+    controlsRef.current = controls;
 
     // Setup scene
     const scene = new THREE.Scene();
@@ -239,12 +272,26 @@ export const VRMViewer = forwardRef<VRMViewerRef>((_, ref) => {
     });
     loaderRef.current = loader;
 
-    // Load default VRM model
-    const modelUrl = "/HatsuneMikuNT.vrm";
+    // Load default VRM model with loading ID check
+    const modelUrl = "/Larasdyah.vrm";
+    const defaultLoadingId = ++loadingIdRef.current;
+    console.log("🔄 Loading default model #" + defaultLoadingId);
+    
     loader.load(
       modelUrl,
       (gltf) => {
-        const vrm = gltf.userData.vrm;
+        // Check if this load is still current
+        if (defaultLoadingId !== loadingIdRef.current) {
+          console.log("⚠️ Ignoring default model load (newer load started)");
+          return;
+        }
+        
+        const vrm = gltf.userData.vrm;  
+
+        // Optimize VRM model (from reference project)
+        console.log("🔧 Optimizing default VRM model...");
+        VRMUtils.removeUnnecessaryVertices(gltf.scene);
+        VRMUtils.removeUnnecessaryJoints(gltf.scene);
 
         vrm.scene.traverse((obj: THREE.Object3D) => {
           obj.frustumCulled = false;
@@ -261,6 +308,7 @@ export const VRMViewer = forwardRef<VRMViewerRef>((_, ref) => {
 
         scene.add(vrm.scene);
         vrmRef.current = vrm;
+        console.log("✅ Default model loaded successfully");
       },
       undefined,
       (error) => console.error("Error loading default VRM model:", error)
@@ -304,6 +352,12 @@ export const VRMViewer = forwardRef<VRMViewerRef>((_, ref) => {
       renderer.dispose();
       controls.dispose();
       scene.clear();
+      
+      // Revoke all blob URLs on unmount
+      blobUrlsToCleanup.forEach((blobUrl) => {
+        URL.revokeObjectURL(blobUrl);
+      });
+      blobUrlsToCleanup.clear();
     };
   }, []);
 

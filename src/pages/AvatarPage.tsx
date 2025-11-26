@@ -29,6 +29,8 @@ const AvatarPage = () => {
   const [selectedInputId, setSelectedInputId] = useState<string>("");
   const [selectedOutputId, setSelectedOutputId] = useState<string>("");
   const [isVRMLoaded, setIsVRMLoaded] = useState(false);
+  const [isModelVisible, setIsModelVisible] = useState(true);
+  const [lastUploadedModel, setLastUploadedModel] = useState<ArrayBuffer | null>(null);
   const mediaRecorderRef = useRef<MediaRecorder | null>(null);
   const audioChunksRef = useRef<Blob[]>([]);
   const audioRef = useRef<HTMLAudioElement | null>(null);
@@ -271,7 +273,38 @@ const AvatarPage = () => {
     }
   };
 
+  const clearModel = () => {
+    if (vrmViewerRef.current) {
+      vrmViewerRef.current.clearScene();
+      setIsVRMLoaded(false);
+      setIsModelVisible(false);
+    }
+  };
+
+  const toggleModelVisibility = async () => {
+    if (isModelVisible) {
+      // Clear the model
+      clearModel();
+    } else {
+      // Show the last uploaded model or default model
+      if (vrmViewerRef.current) {
+        if (lastUploadedModel) {
+          // Reload the last uploaded model
+          console.log("🔄 Reloading last uploaded model...");
+          await vrmViewerRef.current.loadVRM(lastUploadedModel);
+        } else {
+          // Load default model
+          console.log("🔄 Loading default model...");
+          await vrmViewerRef.current.loadVRM("/Larasdyah.vrm");
+        }
+        setIsVRMLoaded(true);
+        setIsModelVisible(true);
+      }
+    }
+  };
+
   const handleUploadModel = () => {
+    // Don't clear automatically - user should use "Clear 3D Model" first if needed
     fileInputRef.current?.click();
   };
 
@@ -281,22 +314,47 @@ const AvatarPage = () => {
     const file = event.target.files?.[0];
     if (file && file.name.endsWith(".vrm")) {
       try {
-        // Read file as ArrayBuffer
+        console.log("📁 File selected:", file.name, `(${(file.size / 1024 / 1024).toFixed(2)} MB)`);
+        
+        // Step 1: Clear existing model first
+        console.log("🧹 Clearing existing model...");
+        if (vrmViewerRef.current) {
+          vrmViewerRef.current.clearScene();
+          setIsVRMLoaded(false);
+          setIsModelVisible(false);
+        }
+        
+        // Step 2: Small delay to ensure cleanup is complete
+        await new Promise(resolve => setTimeout(resolve, 150));
+        
+        // Step 3: Read file as ArrayBuffer
+        console.log("📖 Reading file...");
         const arrayBuffer = await file.arrayBuffer();
+        console.log("✅ File read complete, loading VRM...");
+        
+        // Step 4: Save the ArrayBuffer for later reloading
+        setLastUploadedModel(arrayBuffer);
+        
+        // Step 5: Load the new model
         if (vrmViewerRef.current) {
           await vrmViewerRef.current.loadVRM(arrayBuffer);
-          setIsVRMLoaded(true); // Mark VRM as loaded
+          setIsVRMLoaded(true);
+          setIsModelVisible(true);
+          console.log("✅ VRM model loaded successfully!");
           // Reset file input after successful upload
           event.target.value = "";
         }
       } catch (error) {
-        console.error("Failed to load VRM file:", error);
+        console.error("❌ Failed to load VRM file:", error);
         alert(
           "Failed to load VRM file. Please make sure it's a valid VRM model."
         );
+        // Reset states on error
+        setIsVRMLoaded(false);
+        setIsModelVisible(false);
       }
     } else {
-      alert("Please select a valid VRM file");
+      alert("Please select a valid VRM file (.vrm extension)");
     }
   };
 
@@ -479,6 +537,20 @@ const AvatarPage = () => {
             >
               <Upload className="h-8 w-8 mb-2" />
               <span className="text-sm font-medium">Upload 3D Model (VRM)</span>
+            </DropdownMenuRadioItem>
+
+            <DropdownMenuSeparator />
+
+            {/* Clear/Show 3D Model */}
+            <DropdownMenuRadioItem
+              value="toggle-model"
+              onClick={(e) => {
+                e.preventDefault();
+                toggleModelVisibility();
+              }}
+              className="cursor-pointer"
+            >
+              {isModelVisible ? "Clear 3D Model" : "Show 3D Model"}
             </DropdownMenuRadioItem>
 
             <DropdownMenuSeparator />
