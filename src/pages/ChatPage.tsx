@@ -34,24 +34,65 @@ const ChatPage = () => {
 
     setMessageInput("");
 
-    const stream = await ollama.chat({
-      model: "deepseek-r1:1.5b",
-      messages: [
-        {
-          role: "user",
-          content: messageInput.trim(),
-        },
-      ],
-      think: true,
-      stream: true,
-    });
+    const modelName = "mistral:7b";
+
+    // Try with thinking first, fallback to without thinking if unsupported
+    let stream;
+    let supportsThinking = true;
+
+    try {
+      stream = await ollama.chat({
+        model: modelName,
+        messages: [
+          {
+            role: "system",
+            content:
+              "Anda adalah asisten AI yang membantu. Selalu jawab dalam Bahasa Indonesia yang sopan dan jelas. Berikan penjelasan yang detail dan mudah dipahami.",
+          },
+          {
+            role: "user",
+            content: messageInput.trim(),
+          },
+        ],
+        think: true,
+        stream: true,
+      });
+    } catch (error) {
+      // If thinking is not supported, retry without it
+      if (
+        error instanceof Error &&
+        error.message.includes("does not support thinking")
+      ) {
+        console.log(
+          `Model ${modelName} does not support thinking, using standard mode`
+        );
+        supportsThinking = false;
+        stream = await ollama.chat({
+          model: modelName,
+          messages: [
+            {
+              role: "system",
+              content:
+                "Anda adalah asisten AI yang membantu. Selalu jawab dalam Bahasa Indonesia yang sopan dan jelas. Berikan penjelasan yang detail dan mudah dipahami.",
+            },
+            {
+              role: "user",
+              content: messageInput.trim(),
+            },
+          ],
+          stream: true,
+        });
+      } else {
+        throw error;
+      }
+    }
 
     let fullContent = "";
     let fullThought = "";
 
     for await (const part of stream) {
-      // Handle thinking chunks
-      if (part.message.thinking) {
+      // Handle thinking chunks (only if model supports it)
+      if (supportsThinking && part.message.thinking) {
         fullThought += part.message.thinking;
         setStreamedThought(fullThought);
       }
