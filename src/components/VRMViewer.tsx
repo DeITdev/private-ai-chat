@@ -240,7 +240,7 @@ export const VRMViewer = forwardRef<VRMViewerRef>((_, ref) => {
     loaderRef.current = loader;
 
     // Load default VRM model
-    const modelUrl = "/Larasdyah.vrm";
+    const modelUrl = "/HatsuneMikuNT.vrm";
     loader.load(
       modelUrl,
       (gltf) => {
@@ -256,22 +256,6 @@ export const VRMViewer = forwardRef<VRMViewerRef>((_, ref) => {
             vrm.expressionManager.expressionMap
           )) {
             vrm.expressionManager.setValue(expName, 0);
-          }
-        }
-
-        // Set A-pose by rotating arms downward
-        if (vrm.humanoid) {
-          const leftUpperArm =
-            vrm.humanoid.getNormalizedBoneNode("leftUpperArm");
-          const rightUpperArm =
-            vrm.humanoid.getNormalizedBoneNode("rightUpperArm");
-
-          // Rotate arms down about 30 degrees (0.52 radians) for A-pose
-          if (leftUpperArm) {
-            leftUpperArm.rotation.z = -0.52; // Left arm down
-          }
-          if (rightUpperArm) {
-            rightUpperArm.rotation.z = 0.52; // Right arm down
           }
         }
 
