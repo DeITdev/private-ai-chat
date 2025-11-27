@@ -30,7 +30,10 @@ const AvatarPage = () => {
   const [selectedOutputId, setSelectedOutputId] = useState<string>("");
   const [isVRMLoaded, setIsVRMLoaded] = useState(false);
   const [isModelVisible, setIsModelVisible] = useState(true);
-  const [lastUploadedModel, setLastUploadedModel] = useState<ArrayBuffer | null>(null);
+  const [lastUploadedModel, setLastUploadedModel] =
+    useState<ArrayBuffer | null>(null);
+  const [loadingProgress, setLoadingProgress] = useState(0);
+  const [isLoading, setIsLoading] = useState(false);
   const mediaRecorderRef = useRef<MediaRecorder | null>(null);
   const audioChunksRef = useRef<Blob[]>([]);
   const audioRef = useRef<HTMLAudioElement | null>(null);
@@ -288,15 +291,24 @@ const AvatarPage = () => {
     } else {
       // Show the last uploaded model or default model
       if (vrmViewerRef.current) {
+        setIsLoading(true);
+        setLoadingProgress(0);
+
         if (lastUploadedModel) {
           // Reload the last uploaded model
           console.log("🔄 Reloading last uploaded model...");
-          await vrmViewerRef.current.loadVRM(lastUploadedModel);
+          await vrmViewerRef.current.loadVRM(lastUploadedModel, (progress) => {
+            setLoadingProgress(progress);
+          });
         } else {
           // Load default model
           console.log("🔄 Loading default model...");
-          await vrmViewerRef.current.loadVRM("/Larasdyah.vrm");
+          await vrmViewerRef.current.loadVRM("/Larasdyah.vrm", (progress) => {
+            setLoadingProgress(progress);
+          });
         }
+
+        setIsLoading(false);
         setIsVRMLoaded(true);
         setIsModelVisible(true);
       }
@@ -314,8 +326,12 @@ const AvatarPage = () => {
     const file = event.target.files?.[0];
     if (file && file.name.endsWith(".vrm")) {
       try {
-        console.log("📁 File selected:", file.name, `(${(file.size / 1024 / 1024).toFixed(2)} MB)`);
-        
+        console.log(
+          "📁 File selected:",
+          file.name,
+          `(${(file.size / 1024 / 1024).toFixed(2)} MB)`
+        );
+
         // Step 1: Clear existing model first
         console.log("🧹 Clearing existing model...");
         if (vrmViewerRef.current) {
@@ -323,21 +339,27 @@ const AvatarPage = () => {
           setIsVRMLoaded(false);
           setIsModelVisible(false);
         }
-        
+
         // Step 2: Small delay to ensure cleanup is complete
-        await new Promise(resolve => setTimeout(resolve, 150));
-        
+        await new Promise((resolve) => setTimeout(resolve, 150));
+
         // Step 3: Read file as ArrayBuffer
         console.log("📖 Reading file...");
+        setIsLoading(true);
+        setLoadingProgress(0);
+
         const arrayBuffer = await file.arrayBuffer();
         console.log("✅ File read complete, loading VRM...");
-        
+
         // Step 4: Save the ArrayBuffer for later reloading
         setLastUploadedModel(arrayBuffer);
-        
+
         // Step 5: Load the new model
         if (vrmViewerRef.current) {
-          await vrmViewerRef.current.loadVRM(arrayBuffer);
+          await vrmViewerRef.current.loadVRM(arrayBuffer, (progress) => {
+            setLoadingProgress(progress);
+          });
+          setIsLoading(false);
           setIsVRMLoaded(true);
           setIsModelVisible(true);
           console.log("✅ VRM model loaded successfully!");
@@ -350,6 +372,7 @@ const AvatarPage = () => {
           "Failed to load VRM file. Please make sure it's a valid VRM model."
         );
         // Reset states on error
+        setIsLoading(false);
         setIsVRMLoaded(false);
         setIsModelVisible(false);
       }
@@ -435,17 +458,34 @@ const AvatarPage = () => {
     };
   }, [selectedInputId, selectedOutputId]);
 
-  // Check if VRM is loaded by polling
+  // Initial load: show loading overlay and progress for default model
   useEffect(() => {
-    const checkInterval = setInterval(() => {
-      if (vrmViewerRef.current && !isVRMLoaded) {
-        setIsVRMLoaded(true);
-        clearInterval(checkInterval);
+    let cancelled = false;
+    const loadDefaultModel = async () => {
+      if (vrmViewerRef.current) {
+        setIsLoading(true);
+        setLoadingProgress(0);
+        try {
+          await vrmViewerRef.current.loadVRM("/Larasdyah.vrm", (progress) => {
+            if (!cancelled) setLoadingProgress(progress);
+          });
+          if (!cancelled) {
+            setIsLoading(false);
+            setIsVRMLoaded(true);
+            setIsModelVisible(true);
+          }
+        } catch {
+          setIsLoading(false);
+          setIsVRMLoaded(false);
+          setIsModelVisible(false);
+        }
       }
-    }, 100);
-
-    return () => clearInterval(checkInterval);
-  }, [isVRMLoaded]);
+    };
+    loadDefaultModel();
+    return () => {
+      cancelled = true;
+    };
+  }, []);
 
   // Periodic blink idle animation
   useEffect(() => {
@@ -510,6 +550,24 @@ const AvatarPage = () => {
 
   return (
     <div className="flex flex-col flex-1 h-screen relative overflow-hidden">
+      {/* Loading Overlay */}
+      {isLoading && (
+        <div className="absolute inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-center justify-center">
+          <div className="text-center space-y-4">
+            <div className="text-6xl font-bold text-white">
+              {loadingProgress}%
+            </div>
+            <div className="text-xl text-white/80">Loading 3D Model...</div>
+            <div className="w-64 h-2 bg-white/20 rounded-full overflow-hidden">
+              <div
+                className="h-full bg-primary transition-all duration-300"
+                style={{ width: `${loadingProgress}%` }}
+              />
+            </div>
+          </div>
+        </div>
+      )}
+
       <header className="absolute top-0 left-0 right-0 flex items-center justify-between px-4 h-16 border-b bg-background/80 backdrop-blur-sm z-10">
         <h1 className="text-xl font-bold">3D Avatar Viewer</h1>
 

@@ -7,7 +7,10 @@ import type { VRM } from "@pixiv/three-vrm";
 
 export interface VRMViewerRef {
   setExpression: (name: string, value: number) => void;
-  loadVRM: (arrayBufferOrUrl: ArrayBuffer | string) => Promise<void>;
+  loadVRM: (
+    arrayBufferOrUrl: ArrayBuffer | string,
+    onProgress?: (progress: number) => void
+  ) => Promise<void>;
   clearScene: () => void;
 }
 
@@ -45,7 +48,10 @@ export const VRMViewer = forwardRef<VRMViewerRef>((_, ref) => {
       vrmRef.current = null;
       console.log("✅ Scene cleared (models removed, textures preserved)");
     },
-    loadVRM: async (arrayBufferOrUrl: ArrayBuffer | string) => {
+    loadVRM: async (
+      arrayBufferOrUrl: ArrayBuffer | string,
+      onProgress?: (progress: number) => void
+    ) => {
       return new Promise((resolve, reject) => {
         if (!loaderRef.current || !sceneRef.current) {
           reject(new Error("VRM loader not initialized"));
@@ -60,7 +66,11 @@ export const VRMViewer = forwardRef<VRMViewerRef>((_, ref) => {
         // FIRST: Revoke old blob URLs from previous uploads
         // This is safe because we're about to clear the old model
         if (activeBlobUrlsRef.current.size > 0) {
-          console.log("🗑️ Revoking", activeBlobUrlsRef.current.size, "old blob URL(s)...");
+          console.log(
+            "🗑️ Revoking",
+            activeBlobUrlsRef.current.size,
+            "old blob URL(s)..."
+          );
           activeBlobUrlsRef.current.forEach((blobUrl) => {
             URL.revokeObjectURL(blobUrl);
           });
@@ -96,11 +106,11 @@ export const VRMViewer = forwardRef<VRMViewerRef>((_, ref) => {
             arrayBufferOrUrl,
             handleVRMLoad,
             (progress) => {
-              console.log(
-                "Loading model...",
-                100.0 * (progress.loaded / progress.total),
-                "%"
+              const percent = Math.round(
+                100.0 * (progress.loaded / progress.total)
               );
+              console.log("Loading model...", percent, "%");
+              onProgress?.(percent);
             },
             (error) => {
               console.error("Error loading VRM from URL:", error);
@@ -110,27 +120,30 @@ export const VRMViewer = forwardRef<VRMViewerRef>((_, ref) => {
         } else {
           // Parse from ArrayBuffer (for uploaded files)
           console.log("Loading VRM from ArrayBuffer...");
-          
+
           // Create blob URL and track it
           // WebGL needs continuous access to textures during model lifetime
           const blob = new Blob([arrayBufferOrUrl], {
             type: "model/gltf-binary",
           });
           const blobUrl = URL.createObjectURL(blob);
-          
+
           // Track this blob URL for later cleanup
           activeBlobUrlsRef.current.add(blobUrl);
-          console.log("Created and tracked blob URL:", blobUrl.substring(0, 50) + "...");
+          console.log(
+            "Created and tracked blob URL:",
+            blobUrl.substring(0, 50) + "..."
+          );
 
           loaderRef.current.load(
             blobUrl,
             handleVRMLoad,
             (progress) => {
-              console.log(
-                "Loading uploaded model...",
-                100.0 * (progress.loaded / progress.total),
-                "%"
+              const percent = Math.round(
+                100.0 * (progress.loaded / progress.total)
               );
+              console.log("Loading uploaded model...", percent, "%");
+              onProgress?.(percent);
             },
             (error) => {
               console.error("Error loading VRM from buffer:", error);
@@ -142,7 +155,13 @@ export const VRMViewer = forwardRef<VRMViewerRef>((_, ref) => {
         function handleVRMLoad(gltf: GLTF) {
           // Check if this load is still current
           if (currentLoadingId !== loadingIdRef.current) {
-            console.log("⚠️ Ignoring outdated model load #" + currentLoadingId + " (current: #" + loadingIdRef.current + ")");
+            console.log(
+              "⚠️ Ignoring outdated model load #" +
+                currentLoadingId +
+                " (current: #" +
+                loadingIdRef.current +
+                ")"
+            );
             reject(new Error("Model load cancelled - newer load started"));
             return;
           }
@@ -167,13 +186,13 @@ export const VRMViewer = forwardRef<VRMViewerRef>((_, ref) => {
             const box = new THREE.Box3().setFromObject(vrm.scene);
             const size = box.getSize(new THREE.Vector3());
             const center = box.getCenter(new THREE.Vector3());
-            
+
             // Calculate optimal camera distance
             const maxDim = Math.max(size.x, size.y, size.z);
             const fov = cameraRef.current.fov * (Math.PI / 180);
             let cameraDistance = Math.abs(maxDim / Math.sin(fov / 2));
             cameraDistance *= 1.5; // Add some padding
-            
+
             // Position camera to look at model center
             const cameraHeight = center.y;
             cameraRef.current.position.set(
@@ -181,15 +200,23 @@ export const VRMViewer = forwardRef<VRMViewerRef>((_, ref) => {
               cameraHeight,
               center.z + cameraDistance
             );
-            
+
             // Update controls target to model center
             controlsRef.current.target.copy(center);
             controlsRef.current.update();
-            
+
             console.log("📐 Model bounds:", {
-              size: { x: size.x.toFixed(2), y: size.y.toFixed(2), z: size.z.toFixed(2) },
-              center: { x: center.x.toFixed(2), y: center.y.toFixed(2), z: center.z.toFixed(2) },
-              cameraDistance: cameraDistance.toFixed(2)
+              size: {
+                x: size.x.toFixed(2),
+                y: size.y.toFixed(2),
+                z: size.z.toFixed(2),
+              },
+              center: {
+                x: center.x.toFixed(2),
+                y: center.y.toFixed(2),
+                z: center.z.toFixed(2),
+              },
+              cameraDistance: cameraDistance.toFixed(2),
             });
           }
 
@@ -218,7 +245,7 @@ export const VRMViewer = forwardRef<VRMViewerRef>((_, ref) => {
 
     const container = canvasRef.current.parentElement;
     if (!container) return;
-    
+
     // Capture blob URLs set for cleanup
     const blobUrlsToCleanup = activeBlobUrlsRef.current;
 
@@ -276,7 +303,7 @@ export const VRMViewer = forwardRef<VRMViewerRef>((_, ref) => {
     const modelUrl = "/Larasdyah.vrm";
     const defaultLoadingId = ++loadingIdRef.current;
     console.log("🔄 Loading default model #" + defaultLoadingId);
-    
+
     loader.load(
       modelUrl,
       (gltf) => {
@@ -285,8 +312,8 @@ export const VRMViewer = forwardRef<VRMViewerRef>((_, ref) => {
           console.log("⚠️ Ignoring default model load (newer load started)");
           return;
         }
-        
-        const vrm = gltf.userData.vrm;  
+
+        const vrm = gltf.userData.vrm;
 
         // Optimize VRM model (from reference project)
         console.log("🔧 Optimizing default VRM model...");
@@ -352,7 +379,7 @@ export const VRMViewer = forwardRef<VRMViewerRef>((_, ref) => {
       renderer.dispose();
       controls.dispose();
       scene.clear();
-      
+
       // Revoke all blob URLs on unmount
       blobUrlsToCleanup.forEach((blobUrl) => {
         URL.revokeObjectURL(blobUrl);
