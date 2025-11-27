@@ -1,5 +1,18 @@
 import Dexie, { Table } from "dexie";
 
+// Polyfill for crypto.randomUUID for browsers that don't support it
+function generateUUID() {
+  if (typeof crypto !== "undefined" && crypto.randomUUID) {
+    return crypto.randomUUID();
+  }
+  // Fallback UUID v4 generator
+  return "xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx".replace(/[xy]/g, function (c) {
+    const r = (Math.random() * 16) | 0;
+    const v = c === "x" ? r : (r & 0x3) | 0x8;
+    return v.toString(16);
+  });
+}
+
 // Table declaration
 interface DEX_Thread {
   id: string; // UUID
@@ -38,7 +51,7 @@ class ChatDB extends Dexie {
   }
 
   async createThread(title: string) {
-    const id = crypto.randomUUID();
+    const id = generateUUID();
 
     await this.threads.add({
       id,
@@ -57,7 +70,7 @@ class ChatDB extends Dexie {
   async createMessage(
     message: Pick<DEX_Message, "role" | "content" | "thread_id" | "thought">
   ) {
-    const messageId = crypto.randomUUID();
+    const messageId = generateUUID();
 
     await this.transaction("rw", [this.threads, this.messages], async () => {
       await this.messages.add({

@@ -12,6 +12,7 @@ import {
   SidebarMenuButton,
   SidebarMenuItem,
   Sidebar as SidebarPrimitive,
+  useSidebar,
 } from "~/components/ui/sidebar";
 import { useTheme } from "./ThemeProvider";
 import {
@@ -34,6 +35,7 @@ export const ChatSidebar = () => {
   const [viewMode, setViewMode] = useState<"chat" | "avatar">("chat");
 
   const { setTheme, theme } = useTheme();
+  const { setOpenMobile } = useSidebar();
 
   const location = useLocation();
   const navigate = useNavigate();
@@ -70,6 +72,11 @@ export const ChatSidebar = () => {
 
     setDialogIsOpen(false);
     setTextInput("");
+  };
+
+  const handleOpenDialog = () => {
+    setDialogIsOpen(true);
+    setOpenMobile(false); // Close the drawer when opening dialog
   };
 
   useLayoutEffect(() => {
@@ -115,7 +122,7 @@ export const ChatSidebar = () => {
       <SidebarPrimitive>
         <SidebarHeader>
           <Button
-            onClick={() => setDialogIsOpen(true)}
+            onClick={handleOpenDialog}
             className="w-full justify-start"
             variant="ghost"
           >
