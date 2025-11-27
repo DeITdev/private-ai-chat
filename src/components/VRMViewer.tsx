@@ -299,48 +299,6 @@ export const VRMViewer = forwardRef<VRMViewerRef>((_, ref) => {
     });
     loaderRef.current = loader;
 
-    // Load default VRM model with loading ID check
-    const modelUrl = "/Larasdyah.vrm";
-    const defaultLoadingId = ++loadingIdRef.current;
-    console.log("🔄 Loading default model #" + defaultLoadingId);
-
-    loader.load(
-      modelUrl,
-      (gltf) => {
-        // Check if this load is still current
-        if (defaultLoadingId !== loadingIdRef.current) {
-          console.log("⚠️ Ignoring default model load (newer load started)");
-          return;
-        }
-
-        const vrm = gltf.userData.vrm;
-
-        // Optimize VRM model (from reference project)
-        console.log("🔧 Optimizing default VRM model...");
-        VRMUtils.removeUnnecessaryVertices(gltf.scene);
-        VRMUtils.removeUnnecessaryJoints(gltf.scene);
-
-        vrm.scene.traverse((obj: THREE.Object3D) => {
-          obj.frustumCulled = false;
-        });
-
-        // Reset all expressions to 0
-        if (vrm.expressionManager) {
-          for (const expName of Object.keys(
-            vrm.expressionManager.expressionMap
-          )) {
-            vrm.expressionManager.setValue(expName, 0);
-          }
-        }
-
-        scene.add(vrm.scene);
-        vrmRef.current = vrm;
-        console.log("✅ Default model loaded successfully");
-      },
-      undefined,
-      (error) => console.error("Error loading default VRM model:", error)
-    );
-
     // Add helpers for development
     const gridHelper = new THREE.GridHelper(10, 10);
     scene.add(gridHelper);
