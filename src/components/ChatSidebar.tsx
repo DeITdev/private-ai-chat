@@ -68,7 +68,7 @@ export const ChatSidebar = () => {
   };
 
   const handleCreateThread = async () => {
-    const threadId = await db.createThread(textInput);
+    await db.createThread(textInput);
 
     setDialogIsOpen(false);
     setTextInput("");

@@ -29,11 +29,9 @@ const AvatarPage = () => {
   const [selectedInputId, setSelectedInputId] = useState<string>("");
   const [selectedOutputId, setSelectedOutputId] = useState<string>("");
   const [isVRMLoaded, setIsVRMLoaded] = useState(false);
-  const [isModelVisible, setIsModelVisible] = useState(true);
-  const [lastUploadedModel, setLastUploadedModel] =
-    useState<ArrayBuffer | null>(null);
   const [loadingProgress, setLoadingProgress] = useState(0);
   const [isLoading, setIsLoading] = useState(false);
+  const [showSkipButton, setShowSkipButton] = useState(false);
   const mediaRecorderRef = useRef<MediaRecorder | null>(null);
   const audioChunksRef = useRef<Blob[]>([]);
   const audioRef = useRef<HTMLAudioElement | null>(null);
@@ -43,6 +41,19 @@ const AvatarPage = () => {
   const audioContextRef = useRef<AudioContext | null>(null);
   const analyserRef = useRef<AnalyserNode | null>(null);
   const isAudioSetupRef = useRef(false);
+  const skipTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+  const loadCancelledRef = useRef(false);
+
+  const handleSkipLoading = () => {
+    console.log("⏭️ User skipped loading");
+    loadCancelledRef.current = true;
+    setIsLoading(false);
+    setShowSkipButton(false);
+    if (skipTimeoutRef.current) {
+      clearTimeout(skipTimeoutRef.current);
+      skipTimeoutRef.current = null;
+    }
+  };
 
   const startRecording = async () => {
     try {
@@ -276,45 +287,6 @@ const AvatarPage = () => {
     }
   };
 
-  const clearModel = () => {
-    if (vrmViewerRef.current) {
-      vrmViewerRef.current.clearScene();
-      setIsVRMLoaded(false);
-      setIsModelVisible(false);
-    }
-  };
-
-  const toggleModelVisibility = async () => {
-    if (isModelVisible) {
-      // Clear the model
-      clearModel();
-    } else {
-      // Show the last uploaded model or default model
-      if (vrmViewerRef.current) {
-        setIsLoading(true);
-        setLoadingProgress(0);
-
-        if (lastUploadedModel) {
-          // Reload the last uploaded model
-          console.log("🔄 Reloading last uploaded model...");
-          await vrmViewerRef.current.loadVRM(lastUploadedModel, (progress) => {
-            setLoadingProgress(progress);
-          });
-        } else {
-          // Load default model
-          console.log("🔄 Loading default model...");
-          await vrmViewerRef.current.loadVRM("/Larasdyah.vrm", (progress) => {
-            setLoadingProgress(progress);
-          });
-        }
-
-        setIsLoading(false);
-        setIsVRMLoaded(true);
-        setIsModelVisible(true);
-      }
-    }
-  };
-
   const handleUploadModel = () => {
     // Don't clear automatically - user should use "Clear 3D Model" first if needed
     fileInputRef.current?.click();
@@ -337,7 +309,6 @@ const AvatarPage = () => {
         if (vrmViewerRef.current) {
           vrmViewerRef.current.clearScene();
           setIsVRMLoaded(false);
-          setIsModelVisible(false);
         }
 
         // Step 2: Small delay to ensure cleanup is complete
@@ -351,17 +322,13 @@ const AvatarPage = () => {
         const arrayBuffer = await file.arrayBuffer();
         console.log("✅ File read complete, loading VRM...");
 
-        // Step 4: Save the ArrayBuffer for later reloading
-        setLastUploadedModel(arrayBuffer);
-
-        // Step 5: Load the new model
+        // Step 4: Load the new model
         if (vrmViewerRef.current) {
           await vrmViewerRef.current.loadVRM(arrayBuffer, (progress) => {
             setLoadingProgress(progress);
           });
           setIsLoading(false);
           setIsVRMLoaded(true);
-          setIsModelVisible(true);
           console.log("✅ VRM model loaded successfully!");
           // Reset file input after successful upload
           event.target.value = "";
@@ -374,7 +341,6 @@ const AvatarPage = () => {
         // Reset states on error
         setIsLoading(false);
         setIsVRMLoaded(false);
-        setIsModelVisible(false);
       }
     } else {
       alert("Please select a valid VRM file (.vrm extension)");
@@ -465,25 +431,48 @@ const AvatarPage = () => {
       if (vrmViewerRef.current) {
         setIsLoading(true);
         setLoadingProgress(0);
+        setShowSkipButton(false);
+        loadCancelledRef.current = false;
+
+        // Start timer to show skip button after 10 seconds
+        skipTimeoutRef.current = setTimeout(() => {
+          if (!cancelled && !loadCancelledRef.current) {
+            setShowSkipButton(true);
+          }
+        }, 10000);
+
         try {
-          await vrmViewerRef.current.loadVRM("/Larasdyah.vrm", (progress) => {
-            if (!cancelled) setLoadingProgress(progress);
-          });
-          if (!cancelled) {
+          await vrmViewerRef.current.loadVRM(
+            "/models/HatsuneMikuNT.vrm",
+            (progress) => {
+              if (!cancelled && !loadCancelledRef.current) {
+                setLoadingProgress(progress);
+              }
+            }
+          );
+          if (!cancelled && !loadCancelledRef.current) {
             setIsLoading(false);
             setIsVRMLoaded(true);
-            setIsModelVisible(true);
+            setShowSkipButton(false);
+            if (skipTimeoutRef.current) {
+              clearTimeout(skipTimeoutRef.current);
+            }
           }
         } catch {
-          setIsLoading(false);
-          setIsVRMLoaded(false);
-          setIsModelVisible(false);
+          if (!cancelled && !loadCancelledRef.current) {
+            setIsLoading(false);
+            setIsVRMLoaded(false);
+            setShowSkipButton(false);
+          }
         }
       }
     };
     loadDefaultModel();
     return () => {
       cancelled = true;
+      if (skipTimeoutRef.current) {
+        clearTimeout(skipTimeoutRef.current);
+      }
     };
   }, []);
 
@@ -564,6 +553,15 @@ const AvatarPage = () => {
                 style={{ width: `${loadingProgress}%` }}
               />
             </div>
+            {showSkipButton && (
+              <Button
+                onClick={handleSkipLoading}
+                variant="outline"
+                className="mt-4 bg-white/10 hover:bg-white/20 text-white border-white/30"
+              >
+                Skip...
+              </Button>
+            )}
           </div>
         </div>
       )}
@@ -595,20 +593,6 @@ const AvatarPage = () => {
             >
               <Upload className="h-8 w-8 mb-2" />
               <span className="text-sm font-medium">Upload 3D Model (VRM)</span>
-            </DropdownMenuRadioItem>
-
-            <DropdownMenuSeparator />
-
-            {/* Clear/Show 3D Model */}
-            <DropdownMenuRadioItem
-              value="toggle-model"
-              onClick={(e) => {
-                e.preventDefault();
-                toggleModelVisibility();
-              }}
-              className="cursor-pointer"
-            >
-              {isModelVisible ? "Clear 3D Model" : "Show 3D Model"}
             </DropdownMenuRadioItem>
 
             <DropdownMenuSeparator />
@@ -648,17 +632,18 @@ const AvatarPage = () => {
       </main>
       <footer className="absolute bottom-0 left-0 right-0 p-4 z-10">
         {currentMode === "voice" && (
-          <div className="max-w-3xl mx-auto flex justify-center items-center gap-4">
+          <div className="max-w-3xl mx-auto flex justify-center items-center gap-6">
             {/* Speaker Selection Dropdown */}
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
                 <Button
                   variant="outline"
                   size="sm"
-                  className="text-base font-semibold"
+                  className="text-base font-semibold whitespace-nowrap"
                 >
-                  Speaker
-                  <ChevronDown className="ml-2 h-4 w-4" />
+                  {audioOutputs.find((d) => d.deviceId === selectedOutputId)
+                    ?.label || "Speaker"}
+                  <ChevronDown className="ml-2 h-4 w-4 flex-shrink-0" />
                 </Button>
               </DropdownMenuTrigger>
               <DropdownMenuContent align="end">
@@ -685,7 +670,7 @@ const AvatarPage = () => {
             <Button
               onClick={handleToggleRecording}
               size="unsized"
-              className={`h-20 w-20 rounded-full transition-all ${
+              className={`h-20 w-20 rounded-full transition-all flex items-center justify-center flex-shrink-0 ${
                 isRecording
                   ? "bg-red-500 hover:bg-red-600 dark:bg-red-600 dark:hover:bg-red-700"
                   : "bg-primary hover:bg-primary/90"
@@ -704,10 +689,11 @@ const AvatarPage = () => {
                 <Button
                   variant="outline"
                   size="sm"
-                  className="text-base font-semibold"
+                  className="text-base font-semibold whitespace-nowrap"
                 >
-                  Microphone
-                  <ChevronDown className="ml-2 h-4 w-4" />
+                  {audioInputs.find((d) => d.deviceId === selectedInputId)
+                    ?.label || "Microphone"}
+                  <ChevronDown className="ml-2 h-4 w-4 flex-shrink-0" />
                 </Button>
               </DropdownMenuTrigger>
               <DropdownMenuContent align="start">

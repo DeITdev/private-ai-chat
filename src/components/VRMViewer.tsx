@@ -2,8 +2,10 @@ import { useEffect, useRef, forwardRef, useImperativeHandle } from "react";
 import * as THREE from "three";
 import { GLTFLoader, GLTF } from "three/addons/loaders/GLTFLoader.js";
 import { OrbitControls } from "three/addons/controls/OrbitControls.js";
+import { FBXLoader } from "three/addons/loaders/FBXLoader.js";
 import { VRMLoaderPlugin, VRMUtils } from "@pixiv/three-vrm";
 import type { VRM } from "@pixiv/three-vrm";
+import { remapMixamoAnimationToVrm } from "../utils/remapMixamoAnimationToVrm";
 
 export interface VRMViewerRef {
   setExpression: (name: string, value: number) => void;
@@ -23,6 +25,7 @@ export const VRMViewer = forwardRef<VRMViewerRef>((_, ref) => {
   const cameraRef = useRef<THREE.PerspectiveCamera | null>(null);
   const controlsRef = useRef<OrbitControls | null>(null);
   const loadingIdRef = useRef<number>(0);
+  const mixerRef = useRef<THREE.AnimationMixer | null>(null);
 
   useImperativeHandle(ref, () => ({
     setExpression: (name: string, value: number) => {
@@ -234,11 +237,43 @@ export const VRMViewer = forwardRef<VRMViewerRef>((_, ref) => {
             vrm.expressionManager?.expressionMap
           );
           console.log("VRM model loaded!", vrm);
+
+          // Load breathing idle animation
+          loadBreathingAnimation(vrm);
+
           resolve();
         }
       });
     },
   }));
+
+  const loadBreathingAnimation = (vrm: VRM) => {
+    const fbxLoader = new FBXLoader();
+    fbxLoader.load(
+      "/models/animations/Breathing Idle.fbx",
+      (fbx) => {
+        console.log("🎬 Breathing Idle FBX loaded");
+
+        // Remap Mixamo animation to VRM
+        const vrmAnimationClip = remapMixamoAnimationToVrm(vrm, fbx);
+
+        // Create animation mixer for VRM model
+        const mixer = new THREE.AnimationMixer(vrm.scene);
+        mixerRef.current = mixer;
+
+        // Play the animation with slower speed (0.5x = half speed)
+        const action = mixer.clipAction(vrmAnimationClip);
+        action.timeScale = 0.5;
+        action.play();
+
+        console.log("✨ Breathing animation playing at 0.5x speed");
+      },
+      undefined,
+      (error) => {
+        console.error("Error loading breathing animation:", error);
+      }
+    );
+  };
 
   useEffect(() => {
     if (!canvasRef.current) return;
@@ -316,6 +351,12 @@ export const VRMViewer = forwardRef<VRMViewerRef>((_, ref) => {
       if (vrmRef.current) {
         vrmRef.current.update(delta);
       }
+
+      // Update animation mixer
+      if (mixerRef.current) {
+        mixerRef.current.update(delta);
+      }
+
       controls.update();
 
       renderer.render(scene, camera);
