@@ -14,6 +14,9 @@ dist-ssr
 venv
 .venv
 r3f-vrm-final
+.env
+.env.local
+.env.production
 
 # Editor directories and files
 .vscode/*

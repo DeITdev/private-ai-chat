@@ -2,10 +2,13 @@ import { useLayoutEffect, useRef, useState } from "react";
 import { ChatMessage } from "~/components/ChatMessage";
 import { Button } from "~/components/ui/button";
 import { Textarea } from "~/components/ui/textarea";
-import ollama from "ollama";
 import { db } from "~/lib/dexie";
 import { useParams } from "react-router-dom";
 import { useLiveQuery } from "dexie-react-hooks";
+
+// Add API URL constants
+const RAG_URL = import.meta.env.VITE_RAG_URL || "http://localhost:5003";
+const CHAT_URL = import.meta.env.VITE_CHAT_URL || "http://localhost:5004";
 
 const ChatPage = () => {
   const [messageInput, setMessageInput] = useState("");
@@ -34,13 +37,13 @@ const ChatPage = () => {
 
     setMessageInput("");
 
-    const modelName = "mistral:7b";
+    const modelName = "mistral:latest";
 
     // Query RAG system for relevant context
     console.log("🔍 Querying RAG system for context...");
     let ragContext = "";
     try {
-      const ragResponse = await fetch("http://localhost:5003/query", {
+      const ragResponse = await fetch(`${RAG_URL}/query`, {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
@@ -95,31 +98,60 @@ const ChatPage = () => {
       },
     ];
 
-    // mistral:7b doesn't support thinking, so just use standard mode
-    const stream = await ollama.chat({
-      model: modelName,
-      messages: chatMessages,
-      stream: true,
-    });
+    try {
+      // Send to backend chat server (which proxies to Ollama)
+      const response = await fetch(`${CHAT_URL}/chat`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          model: modelName,
+          messages: chatMessages,
+          stream: true,
+        }),
+      });
 
-    let fullContent = "";
-
-    for await (const part of stream) {
-      // Handle content chunks
-      if (part.message.content) {
-        fullContent += part.message.content;
-        setStreamedMessage(fullContent);
+      if (!response.ok) {
+        throw new Error("Chat server error");
       }
+
+      const reader = response.body?.getReader();
+      const decoder = new TextDecoder();
+      let fullContent = "";
+
+      while (reader) {
+        const { done, value } = await reader.read();
+        if (done) break;
+
+        const chunk = decoder.decode(value);
+        const lines = chunk.split("\n").filter((line) => line.trim());
+
+        for (const line of lines) {
+          try {
+            const json = JSON.parse(line);
+            if (json.message?.content) {
+              fullContent += json.message.content;
+              setStreamedMessage(fullContent);
+            }
+          } catch {
+            // Skip invalid JSON
+          }
+        }
+      }
+
+      await db.createMessage({
+        content: fullContent,
+        role: "assistant",
+        thought: "",
+        thread_id: params.threadId as string,
+      });
+
+      setStreamedMessage("");
+    } catch (error) {
+      console.error("❌ Error calling Chat API:", error);
+      alert("Failed to connect to chat server");
     }
-
-    await db.createMessage({
-      content: fullContent,
-      role: "assistant",
-      thought: "",
-      thread_id: params.threadId as string,
-    });
-
-    setStreamedMessage("");
   };
 
   const handleScrollToBottom = () => {
