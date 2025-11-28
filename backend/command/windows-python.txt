@@ -1,0 +1,14 @@
+# Create a virtual environment named 'venv'
+python -m venv venv
+
+# Activate the virtual environment (Windows)
+venv\Scripts\activate
+
+# Install dependencies from requirements.txt
+pip install -r requirements.txt
+
+# Additionally, install python-dotenv for environment variables (optional but recommended)
+pip install python-dotenv
+
+# deactivate the virtual environment when done
+deactivate
