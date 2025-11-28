@@ -12,6 +12,7 @@ dist
 dist-ssr
 *.local
 venv
+.venv
 r3f-vrm-final
 
 # Editor directories and files
@@ -29,10 +30,10 @@ Larasdyah.vrm
 Evernight.vrm
 
 # RAG / Vector Store
-data/vector_store/
-data/pdfs/*.pdf
-!data/pdfs/README.md
-!data/pdfs/HOW_TO_ADD_PDF.md
+/backend/data/vector_store/
+backend/data/pdfs/*.pdf
+!backend/data/pdfs/README.md
+!backend/data/pdfs/HOW_TO_ADD_PDF.md
 
 # Python cache
 __pycache__/
