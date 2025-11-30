@@ -14,6 +14,8 @@ export interface VRMViewerRef {
     onProgress?: (progress: number) => void
   ) => Promise<void>;
   clearScene: () => void;
+  loadAnimation: (animationPath: string) => Promise<void>;
+  setCameraControlsEnabled: (enabled: boolean) => void;
 }
 
 export const VRMViewer = forwardRef<VRMViewerRef>((_, ref) => {
@@ -26,12 +28,69 @@ export const VRMViewer = forwardRef<VRMViewerRef>((_, ref) => {
   const controlsRef = useRef<OrbitControls | null>(null);
   const loadingIdRef = useRef<number>(0);
   const mixerRef = useRef<THREE.AnimationMixer | null>(null);
+  const currentAnimationRef = useRef<THREE.AnimationAction | null>(null);
+  const loadedAnimationsRef = useRef<Map<string, THREE.AnimationClip>>(
+    new Map()
+  );
 
   useImperativeHandle(ref, () => ({
     setExpression: (name: string, value: number) => {
       if (vrmRef.current?.expressionManager) {
         vrmRef.current.expressionManager.setValue(name, value);
       }
+    },
+    setCameraControlsEnabled: (enabled: boolean) => {
+      if (controlsRef.current) {
+        controlsRef.current.enableDamping = enabled;
+        if (!enabled) {
+          // Reset damping immediately when disabled
+          controlsRef.current.update();
+        }
+      }
+    },
+    loadAnimation: async (animationPath: string) => {
+      if (!vrmRef.current) {
+        throw new Error("VRM not loaded");
+      }
+
+      return new Promise((resolve, reject) => {
+        // Check if animation is already loaded
+        if (loadedAnimationsRef.current.has(animationPath)) {
+          const clip = loadedAnimationsRef.current.get(animationPath)!;
+          playAnimation(clip);
+          resolve();
+          return;
+        }
+
+        // Load new animation
+        const fbxLoader = new FBXLoader();
+        fbxLoader.load(
+          animationPath,
+          (fbx) => {
+            console.log("🎬 Animation FBX loaded:", animationPath);
+
+            // Remap Mixamo animation to VRM
+            const vrmAnimationClip = remapMixamoAnimationToVrm(
+              vrmRef.current!,
+              fbx
+            );
+
+            // Cache the animation
+            loadedAnimationsRef.current.set(animationPath, vrmAnimationClip);
+
+            // Play the animation
+            playAnimation(vrmAnimationClip);
+
+            console.log("✨ Animation loaded and playing:", animationPath);
+            resolve();
+          },
+          undefined,
+          (error) => {
+            console.error("Error loading animation:", error);
+            reject(error);
+          }
+        );
+      });
     },
     clearScene: () => {
       if (!sceneRef.current) return;
@@ -247,15 +306,44 @@ export const VRMViewer = forwardRef<VRMViewerRef>((_, ref) => {
     },
   }));
 
+  const playAnimation = (clip: THREE.AnimationClip) => {
+    if (!vrmRef.current) return;
+
+    // Create mixer if it doesn't exist
+    if (!mixerRef.current) {
+      mixerRef.current = new THREE.AnimationMixer(vrmRef.current.scene);
+    }
+
+    // Stop current animation if playing
+    if (currentAnimationRef.current) {
+      currentAnimationRef.current.fadeOut(0.3);
+    }
+
+    // Play new animation
+    const action = mixerRef.current.clipAction(clip);
+    action.reset();
+    action.fadeIn(0.3);
+    action.timeScale = 0.5; // Set speed to 0.5x (same as breathing idle)
+    action.play();
+
+    currentAnimationRef.current = action;
+  };
+
   const loadBreathingAnimation = (vrm: VRM) => {
     const fbxLoader = new FBXLoader();
     fbxLoader.load(
-      "/models/animations/Breathing Idle.fbx",
+      "/models/animations/Breathing_Idle.fbx",
       (fbx) => {
         console.log("🎬 Breathing Idle FBX loaded");
 
         // Remap Mixamo animation to VRM
         const vrmAnimationClip = remapMixamoAnimationToVrm(vrm, fbx);
+
+        // Cache the animation
+        loadedAnimationsRef.current.set(
+          "/models/animations/Breathing_Idle.fbx",
+          vrmAnimationClip
+        );
 
         // Create animation mixer for VRM model
         const mixer = new THREE.AnimationMixer(vrm.scene);
@@ -265,6 +353,8 @@ export const VRMViewer = forwardRef<VRMViewerRef>((_, ref) => {
         const action = mixer.clipAction(vrmAnimationClip);
         action.timeScale = 0.5;
         action.play();
+
+        currentAnimationRef.current = action;
 
         console.log("✨ Breathing animation playing at 0.5x speed");
       },
@@ -311,6 +401,22 @@ export const VRMViewer = forwardRef<VRMViewerRef>((_, ref) => {
     const controls = new OrbitControls(camera, renderer.domElement);
     controls.screenSpacePanning = true;
     controls.target.set(0.0, 1.0, 0.0);
+
+    // Enable smooth damping for inertia-like behavior (rotation and zoom)
+    controls.enableDamping = true;
+    controls.dampingFactor = 0.05;
+
+    // Enable smooth zoom
+    controls.enableZoom = true;
+    controls.zoomSpeed = 1.0;
+
+    // Set distance constraints
+    controls.minDistance = 1;
+    controls.maxDistance = 10;
+
+    // Limit vertical rotation (polar angle)
+    controls.maxPolarAngle = Math.PI / 2; // Don't allow camera below horizon
+
     controls.update();
     controlsRef.current = controls;
 

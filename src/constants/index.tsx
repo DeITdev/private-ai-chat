@@ -15,3 +15,21 @@ export const predefinedAvatars = [
     thumbnail: "/larasdyah-icon.png",
   },
 ];
+
+export const predefinedAnimations = [
+  {
+    name: "Breathing Idle",
+    path: "/models/animations/Breathing_Idle.fbx",
+    thumbnail: "/default-thumbnail-3davatar.png",
+  },
+  {
+    name: "Swing Dancing",
+    path: "/models/animations/Swing_Dancing.fbx",
+    thumbnail: "/default-thumbnail-3davatar.png",
+  },
+  {
+    name: "Thriller Part 2",
+    path: "/models/animations/Thriller_Part_2.fbx",
+    thumbnail: "/default-thumbnail-3davatar.png",
+  },
+];
