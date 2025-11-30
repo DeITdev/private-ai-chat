@@ -16,6 +16,8 @@ export interface VRMViewerRef {
   clearScene: () => void;
   loadAnimation: (animationPath: string) => Promise<void>;
   setCameraControlsEnabled: (enabled: boolean) => void;
+  setResetCameraPosition: (enabled: boolean) => void;
+  setCameraFollowCharacter: (enabled: boolean) => void;
 }
 
 export const VRMViewer = forwardRef<VRMViewerRef>((_, ref) => {
@@ -32,6 +34,15 @@ export const VRMViewer = forwardRef<VRMViewerRef>((_, ref) => {
   const loadedAnimationsRef = useRef<Map<string, THREE.AnimationClip>>(
     new Map()
   );
+  const resetCameraPositionRef = useRef<boolean>(false);
+  const initialCameraPositionRef = useRef<THREE.Vector3>(
+    new THREE.Vector3(0, 1, 5)
+  );
+  const initialCameraTargetRef = useRef<THREE.Vector3>(
+    new THREE.Vector3(0, 1, 0)
+  );
+  const characterOriginRef = useRef<THREE.Vector3>(new THREE.Vector3(0, 1, 0));
+  const cameraFollowCharacterRef = useRef<boolean>(false);
 
   useImperativeHandle(ref, () => ({
     setExpression: (name: string, value: number) => {
@@ -47,6 +58,20 @@ export const VRMViewer = forwardRef<VRMViewerRef>((_, ref) => {
           controlsRef.current.update();
         }
       }
+    },
+    setResetCameraPosition: (enabled: boolean) => {
+      resetCameraPositionRef.current = enabled;
+      if (enabled && controlsRef.current && cameraRef.current) {
+        // Reset camera to initial position and target once
+        cameraRef.current.position.copy(initialCameraPositionRef.current);
+        controlsRef.current.target.copy(initialCameraTargetRef.current);
+        controlsRef.current.update();
+        // Immediately turn off so user can pan around after reset
+        resetCameraPositionRef.current = false;
+      }
+    },
+    setCameraFollowCharacter: (enabled: boolean) => {
+      cameraFollowCharacterRef.current = enabled;
     },
     loadAnimation: async (animationPath: string) => {
       if (!vrmRef.current) {
@@ -267,6 +292,13 @@ export const VRMViewer = forwardRef<VRMViewerRef>((_, ref) => {
             controlsRef.current.target.copy(center);
             controlsRef.current.update();
 
+            // Store initial camera position and target for reset feature
+            initialCameraPositionRef.current.copy(cameraRef.current.position);
+            initialCameraTargetRef.current.copy(controlsRef.current.target);
+
+            // Store character origin for camera follow feature
+            characterOriginRef.current.copy(center);
+
             console.log("📐 Model bounds:", {
               size: {
                 x: size.x.toFixed(2),
@@ -461,6 +493,19 @@ export const VRMViewer = forwardRef<VRMViewerRef>((_, ref) => {
       // Update animation mixer
       if (mixerRef.current) {
         mixerRef.current.update(delta);
+      }
+
+      // Follow character if enabled (tracks hips bone position)
+      if (cameraFollowCharacterRef.current && vrmRef.current) {
+        // Find hips bone (common VRM bone name)
+        const hips = vrmRef.current.humanoid?.getNormalizedBoneNode("hips");
+        if (hips) {
+          // Get world position of hips
+          const hipsPosition = new THREE.Vector3();
+          hips.getWorldPosition(hipsPosition);
+          // Update camera target to follow hips
+          controls.target.copy(hipsPosition);
+        }
       }
 
       controls.update();

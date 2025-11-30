@@ -51,6 +51,8 @@ const AvatarPage = () => {
     "/models/animations/Breathing_Idle.fbx"
   );
   const [enableSmoothCamera, setEnableSmoothCamera] = useState(true);
+  const [resetCameraPosition, setResetCameraPosition] = useState(false);
+  const [cameraFollowCharacter, setCameraFollowCharacter] = useState(false);
 
   const mediaRecorderRef = useRef<MediaRecorder | null>(null);
   const audioChunksRef = useRef<Blob[]>([]);
@@ -63,6 +65,7 @@ const AvatarPage = () => {
   const isAudioSetupRef = useRef(false);
   const skipTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   const loadCancelledRef = useRef(false);
+  const audioPermissionRequestedRef = useRef(false);
 
   const handleSkipLoading = () => {
     console.log("⏭️ User skipped loading");
@@ -77,6 +80,12 @@ const AvatarPage = () => {
 
   const startRecording = async () => {
     try {
+      // Request audio permission on first use
+      if (!audioPermissionRequestedRef.current) {
+        console.log("🎤 Requesting microphone permission...");
+        audioPermissionRequestedRef.current = true;
+      }
+
       const audioConstraints = selectedInputId
         ? { deviceId: { exact: selectedInputId } }
         : true;
@@ -418,37 +427,7 @@ const AvatarPage = () => {
     }
   };
 
-  // Request microphone and speaker permissions on page load
-  useEffect(() => {
-    const requestPermissions = async () => {
-      try {
-        // Request microphone permission
-        await navigator.mediaDevices
-          .getUserMedia({ audio: true })
-          .then((stream) => {
-            // Stop all tracks immediately after getting permission
-            stream.getTracks().forEach((track) => track.stop());
-          });
-        console.log("✓ Microphone permission granted");
-      } catch {
-        console.warn("Microphone permission denied or unavailable");
-      }
-
-      try {
-        // Request speaker permission (if supported)
-        if (navigator.permissions) {
-          const result = await navigator.permissions.query({
-            name: "speaker" as PermissionName,
-          } as PermissionDescriptor);
-          console.log("Speaker permission status:", result.state);
-        }
-      } catch {
-        console.log("Speaker permission query not supported on this browser");
-      }
-    };
-
-    requestPermissions();
-  }, []);
+  // Audio permission will be requested on first record button press
 
   // Enumerate audio devices
   useEffect(() => {
@@ -595,6 +574,20 @@ const AvatarPage = () => {
     }
   }, [enableSmoothCamera]);
 
+  // Sync reset camera position state
+  useEffect(() => {
+    if (vrmViewerRef.current) {
+      vrmViewerRef.current.setResetCameraPosition(resetCameraPosition);
+    }
+  }, [resetCameraPosition]);
+
+  // Sync camera follow character state
+  useEffect(() => {
+    if (vrmViewerRef.current) {
+      vrmViewerRef.current.setCameraFollowCharacter(cameraFollowCharacter);
+    }
+  }, [cameraFollowCharacter]);
+
   return (
     <div className="flex flex-col flex-1 h-screen relative overflow-hidden">
       {/* Loading Overlay */}
@@ -646,6 +639,24 @@ const AvatarPage = () => {
               <Switch
                 checked={enableSmoothCamera}
                 onCheckedChange={setEnableSmoothCamera}
+              />
+            </div>
+            {/* Reset Camera Position Toggle */}
+            <div className="flex items-center justify-between px-2 py-3 cursor-pointer hover:bg-accent rounded-sm">
+              <span className="text-sm font-medium">Reset Camera Position</span>
+              <Switch
+                checked={resetCameraPosition}
+                onCheckedChange={setResetCameraPosition}
+              />
+            </div>
+            {/* Camera Follow Character Toggle */}
+            <div className="flex items-center justify-between px-2 py-3 cursor-pointer hover:bg-accent rounded-sm">
+              <span className="text-sm font-medium">
+                Camera Follow Character
+              </span>
+              <Switch
+                checked={cameraFollowCharacter}
+                onCheckedChange={setCameraFollowCharacter}
               />
             </div>
             {/* Upload 3D Model */}
@@ -701,7 +712,7 @@ const AvatarPage = () => {
                 <DropdownMenu>
                   <DropdownMenuTrigger asChild>
                     <button className="absolute right-0 top-1/2 -translate-y-1/2 translate-x-[calc(50%+8px)] flex items-center justify-center hover:opacity-70">
-                      <ChevronDown className="h-3 w-3 text-foreground" />
+                      <ChevronDown className="h-4 w-4 text-foreground" />
                     </button>
                   </DropdownMenuTrigger>
                   <DropdownMenuContent align="start">
