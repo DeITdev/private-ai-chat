@@ -19,7 +19,7 @@ def chat():
     try:
         data = request.json
         messages = data.get('messages', [])
-        model = data.get('model', 'mistral:latest')
+        model = data.get('model', 'mistral:7b')
         stream = data.get('stream', True)
 
         # Forward request to local Ollama

@@ -37,7 +37,7 @@ const ChatPage = () => {
 
     setMessageInput("");
 
-    const modelName = "mistral:latest";
+    const modelName = "mistral:7b";
 
     // Query RAG system for relevant context
     console.log("🔍 Querying RAG system for context...");

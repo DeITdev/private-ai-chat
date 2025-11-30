@@ -1,0 +1,8 @@
+open workspace settings.json file
+
+add this:
+{
+  "python-envs.defaultEnvManager": "ms-python.python:system",
+  "python.defaultInterpreterPath": "${workspaceFolder}/backend/.venv/bin/python",
+  "python-envs.pythonProjects": []
+}
