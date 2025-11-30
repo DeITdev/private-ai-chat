@@ -13,6 +13,7 @@ import {
   Upload,
   ChevronDown,
 } from "lucide-react";
+import { predefinedAvatars } from "~/constants";
 import { Button } from "~/components/ui/button";
 import {
   DropdownMenu,
@@ -20,6 +21,12 @@ import {
   DropdownMenuTrigger,
   DropdownMenuRadioItem,
 } from "~/components/ui/dropdown-menu";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+} from "~/components/ui/dialog";
 import { useNavigate } from "react-router-dom";
 import ollama from "ollama";
 
@@ -32,6 +39,11 @@ const AvatarPage = () => {
   const [loadingProgress, setLoadingProgress] = useState(0);
   const [isLoading, setIsLoading] = useState(false);
   const [showSkipButton, setShowSkipButton] = useState(false);
+  const [showAvatarModal, setShowAvatarModal] = useState(false);
+  const [selectedAvatar, setSelectedAvatar] = useState(
+    "/models/HatsuneMikuNT.vrm"
+  );
+
   const mediaRecorderRef = useRef<MediaRecorder | null>(null);
   const audioChunksRef = useRef<Blob[]>([]);
   const audioRef = useRef<HTMLAudioElement | null>(null);
@@ -285,6 +297,38 @@ const AvatarPage = () => {
     fileInputRef.current?.click();
   };
 
+  const handleAvatarSelect = async (avatarPath: string) => {
+    try {
+      console.log("🔄 Switching to avatar:", avatarPath);
+
+      // Clear existing model first
+      if (vrmViewerRef.current) {
+        vrmViewerRef.current.clearScene();
+        setIsVRMLoaded(false);
+      }
+
+      await new Promise((resolve) => setTimeout(resolve, 150));
+
+      setIsLoading(true);
+      setLoadingProgress(0);
+
+      if (vrmViewerRef.current) {
+        await vrmViewerRef.current.loadVRM(avatarPath, (progress) => {
+          setLoadingProgress(progress);
+        });
+        setIsLoading(false);
+        setIsVRMLoaded(true);
+        setSelectedAvatar(avatarPath);
+        setShowAvatarModal(false);
+        console.log("✅ Avatar switched successfully!");
+      }
+    } catch (error) {
+      console.error("❌ Failed to switch avatar:", error);
+      setIsLoading(false);
+      setIsVRMLoaded(false);
+    }
+  };
+
   const handleFileSelected = async (
     event: React.ChangeEvent<HTMLInputElement>
   ) => {
@@ -418,14 +462,11 @@ const AvatarPage = () => {
         }, 10000);
 
         try {
-          await vrmViewerRef.current.loadVRM(
-            "/models/HatsuneMikuNT.vrm",
-            (progress) => {
-              if (!cancelled && !loadCancelledRef.current) {
-                setLoadingProgress(progress);
-              }
+          await vrmViewerRef.current.loadVRM(selectedAvatar, (progress) => {
+            if (!cancelled && !loadCancelledRef.current) {
+              setLoadingProgress(progress);
             }
-          );
+          });
           if (!cancelled && !loadCancelledRef.current) {
             setIsLoading(false);
             setIsVRMLoaded(true);
@@ -450,7 +491,7 @@ const AvatarPage = () => {
         clearTimeout(skipTimeoutRef.current);
       }
     };
-  }, []);
+  }, [selectedAvatar]);
 
   // Periodic blink idle animation
   useEffect(() => {
@@ -655,7 +696,7 @@ const AvatarPage = () => {
             <DockLabel>3D Avatar</DockLabel>
             <DockIcon>
               <button
-                onClick={handleUploadModel}
+                onClick={() => setShowAvatarModal(true)}
                 className="h-full w-full flex items-center justify-center"
               >
                 <svg
@@ -670,6 +711,43 @@ const AvatarPage = () => {
           </DockItem>
         </Dock>
       </footer>
+
+      {/* 3D Avatar Selection Modal */}
+      <Dialog open={showAvatarModal} onOpenChange={setShowAvatarModal}>
+        <DialogContent className="sm:max-w-[600px]">
+          <DialogHeader>
+            <DialogTitle>Select 3D Avatar</DialogTitle>
+          </DialogHeader>
+          <div className="max-h-[60vh] overflow-y-auto">
+            <div className="grid grid-cols-3 gap-4 p-4">
+              {predefinedAvatars.map((avatar) => (
+                <button
+                  key={avatar.path}
+                  onClick={() => handleAvatarSelect(avatar.path)}
+                  className="group relative flex flex-col items-center gap-2 transition-transform hover:-translate-y-2"
+                >
+                  <div
+                    className={`w-full aspect-square rounded-2xl overflow-hidden border-2 transition-colors ${
+                      selectedAvatar === avatar.path
+                        ? "border-primary"
+                        : "border-transparent group-hover:border-primary/50"
+                    }`}
+                  >
+                    <img
+                      src={avatar.thumbnail}
+                      alt={avatar.name}
+                      className="w-full h-full object-cover"
+                    />
+                  </div>
+                  <span className="text-sm font-medium text-center">
+                    {avatar.name}
+                  </span>
+                </button>
+              ))}
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
 
       <audio ref={audioRef} className="hidden" />
       <input
