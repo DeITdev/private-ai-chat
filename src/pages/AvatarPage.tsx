@@ -17,6 +17,7 @@ import {
 import { predefinedAvatars, predefinedAnimations } from "~/constants";
 import { Button } from "~/components/ui/button";
 import { Switch } from "~/components/ui/switch";
+import { Separator } from "~/components/ui/separator";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -56,8 +57,8 @@ const AvatarPage = () => {
     "/models/animations/Breathing_Idle.fbx"
   );
   const [enableSmoothCamera, setEnableSmoothCamera] = useState(true);
-  const [resetCameraPosition, setResetCameraPosition] = useState(false);
   const [cameraFollowCharacter, setCameraFollowCharacter] = useState(false);
+  const [hideGridAxes, setHideGridAxes] = useState(false);
 
   const mediaRecorderRef = useRef<MediaRecorder | null>(null);
   const audioChunksRef = useRef<Blob[]>([]);
@@ -621,19 +622,19 @@ const AvatarPage = () => {
     }
   }, [enableSmoothCamera]);
 
-  // Sync reset camera position state
-  useEffect(() => {
-    if (vrmViewerRef.current) {
-      vrmViewerRef.current.setResetCameraPosition(resetCameraPosition);
-    }
-  }, [resetCameraPosition]);
-
   // Sync camera follow character state
   useEffect(() => {
     if (vrmViewerRef.current) {
       vrmViewerRef.current.setCameraFollowCharacter(cameraFollowCharacter);
     }
   }, [cameraFollowCharacter]);
+
+  // Sync hide grid & axes state
+  useEffect(() => {
+    if (vrmViewerRef.current) {
+      vrmViewerRef.current.setHideGridAxes(hideGridAxes);
+    }
+  }, [hideGridAxes]);
 
   return (
     <div className="flex flex-col h-screen w-full fixed inset-0 overflow-hidden lg:pl-64">
@@ -713,14 +714,6 @@ const AvatarPage = () => {
                 onCheckedChange={setEnableSmoothCamera}
               />
             </div>
-            {/* Reset Camera Position Toggle */}
-            <div className="flex items-center justify-between px-2 py-3 cursor-pointer hover:bg-accent rounded-sm">
-              <span className="text-sm font-medium">Reset Camera Position</span>
-              <Switch
-                checked={resetCameraPosition}
-                onCheckedChange={setResetCameraPosition}
-              />
-            </div>
             {/* Camera Follow Character Toggle */}
             <div className="flex items-center justify-between px-2 py-3 cursor-pointer hover:bg-accent rounded-sm">
               <span className="text-sm font-medium">
@@ -731,6 +724,28 @@ const AvatarPage = () => {
                 onCheckedChange={setCameraFollowCharacter}
               />
             </div>
+            {/* Hide Grid & Axes Toggle */}
+            <div className="flex items-center justify-between px-2 py-3 cursor-pointer hover:bg-accent rounded-sm">
+              <span className="text-sm font-medium">Hide Grid & Axes</span>
+              <Switch
+                checked={hideGridAxes}
+                onCheckedChange={setHideGridAxes}
+              />
+            </div>
+            {/* Separator */}
+            <Separator className="my-1" />
+            {/* Reset Camera Position Button */}
+            <DropdownMenuRadioItem
+              value="reset"
+              onClick={() => {
+                if (vrmViewerRef.current) {
+                  vrmViewerRef.current.resetCameraPosition();
+                }
+              }}
+              className="flex items-center justify-center py-3 cursor-pointer hover:bg-accent"
+            >
+              <span className="text-sm font-medium">Reset Camera Position</span>
+            </DropdownMenuRadioItem>
             {/* Upload 3D Model */}
             <DropdownMenuRadioItem
               value="upload"

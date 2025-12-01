@@ -16,8 +16,9 @@ export interface VRMViewerRef {
   clearScene: () => void;
   loadAnimation: (animationPath: string) => Promise<void>;
   setCameraControlsEnabled: (enabled: boolean) => void;
-  setResetCameraPosition: (enabled: boolean) => void;
+  resetCameraPosition: () => void;
   setCameraFollowCharacter: (enabled: boolean) => void;
+  setHideGridAxes: (hide: boolean) => void;
 }
 
 export const VRMViewer = forwardRef<VRMViewerRef>((_, ref) => {
@@ -34,7 +35,6 @@ export const VRMViewer = forwardRef<VRMViewerRef>((_, ref) => {
   const loadedAnimationsRef = useRef<Map<string, THREE.AnimationClip>>(
     new Map()
   );
-  const resetCameraPositionRef = useRef<boolean>(false);
   const initialCameraPositionRef = useRef<THREE.Vector3>(
     new THREE.Vector3(0, 1, 5)
   );
@@ -43,6 +43,16 @@ export const VRMViewer = forwardRef<VRMViewerRef>((_, ref) => {
   );
   const characterOriginRef = useRef<THREE.Vector3>(new THREE.Vector3(0, 1, 0));
   const cameraFollowCharacterRef = useRef<boolean>(false);
+  const gridHelperRef = useRef<THREE.GridHelper | null>(null);
+  const axesHelperRef = useRef<THREE.AxesHelper | null>(null);
+  const cameraFollowOffsetRef = useRef<THREE.Vector3>(
+    new THREE.Vector3(0, 0, 0)
+  );
+  const originalFollowTargetRef = useRef<THREE.Vector3>(
+    new THREE.Vector3(0, 1, 0)
+  );
+  const isRightMouseDownRef = useRef<boolean>(false);
+  const lastMousePositionRef = useRef<{ x: number; y: number }>({ x: 0, y: 0 });
 
   useImperativeHandle(ref, () => ({
     setExpression: (name: string, value: number) => {
@@ -59,19 +69,37 @@ export const VRMViewer = forwardRef<VRMViewerRef>((_, ref) => {
         }
       }
     },
-    setResetCameraPosition: (enabled: boolean) => {
-      resetCameraPositionRef.current = enabled;
-      if (enabled && controlsRef.current && cameraRef.current) {
-        // Reset camera to initial position and target once
+    resetCameraPosition: () => {
+      if (controlsRef.current && cameraRef.current) {
+        // Reset camera to initial position and target
         cameraRef.current.position.copy(initialCameraPositionRef.current);
         controlsRef.current.target.copy(initialCameraTargetRef.current);
         controlsRef.current.update();
-        // Immediately turn off so user can pan around after reset
-        resetCameraPositionRef.current = false;
       }
     },
     setCameraFollowCharacter: (enabled: boolean) => {
       cameraFollowCharacterRef.current = enabled;
+      if (enabled) {
+        // Reset offset to zero when enabling
+        cameraFollowOffsetRef.current.set(0, 0, 0);
+        // Store original target position
+        if (vrmRef.current) {
+          const hips = vrmRef.current.humanoid?.getNormalizedBoneNode("hips");
+          if (hips) {
+            const hipsPosition = new THREE.Vector3();
+            hips.getWorldPosition(hipsPosition);
+            originalFollowTargetRef.current.copy(hipsPosition);
+          }
+        }
+      }
+    },
+    setHideGridAxes: (hide: boolean) => {
+      if (gridHelperRef.current) {
+        gridHelperRef.current.visible = !hide;
+      }
+      if (axesHelperRef.current) {
+        axesHelperRef.current.visible = !hide;
+      }
     },
     loadAnimation: async (animationPath: string) => {
       if (!vrmRef.current) {
@@ -516,8 +544,8 @@ export const VRMViewer = forwardRef<VRMViewerRef>((_, ref) => {
     controls.minDistance = 1;
     controls.maxDistance = 10;
 
-    // Limit vertical rotation (polar angle)
-    controls.maxPolarAngle = Math.PI / 2; // Don't allow camera below horizon
+    // Allow full 360-degree rotation (no polar angle limits)
+    // controls.maxPolarAngle = Math.PI / 2; // Removed to allow full rotation
 
     controls.update();
     controlsRef.current = controls;
@@ -544,9 +572,11 @@ export const VRMViewer = forwardRef<VRMViewerRef>((_, ref) => {
 
     // Add helpers for development
     const gridHelper = new THREE.GridHelper(10, 10);
+    gridHelperRef.current = gridHelper;
     scene.add(gridHelper);
 
     const axesHelper = new THREE.AxesHelper(5);
+    axesHelperRef.current = axesHelper;
     scene.add(axesHelper);
 
     // Animation loop
@@ -573,8 +603,12 @@ export const VRMViewer = forwardRef<VRMViewerRef>((_, ref) => {
           // Get world position of hips
           const hipsPosition = new THREE.Vector3();
           hips.getWorldPosition(hipsPosition);
-          // Update camera target to follow hips
-          controls.target.copy(hipsPosition);
+          // Apply user-defined offset
+          const targetPosition = hipsPosition
+            .clone()
+            .add(cameraFollowOffsetRef.current);
+          // Update camera target to follow hips with offset
+          controls.target.copy(targetPosition);
         }
       }
 
@@ -593,9 +627,56 @@ export const VRMViewer = forwardRef<VRMViewerRef>((_, ref) => {
     };
     window.addEventListener("resize", handleResize);
 
+    // Mouse event handlers for camera follow offset adjustment
+    const handleMouseDown = (event: MouseEvent) => {
+      if (event.button === 2 && cameraFollowCharacterRef.current) {
+        // Right mouse button
+        isRightMouseDownRef.current = true;
+        lastMousePositionRef.current = { x: event.clientX, y: event.clientY };
+        event.preventDefault();
+      }
+    };
+
+    const handleMouseMove = (event: MouseEvent) => {
+      if (isRightMouseDownRef.current && cameraFollowCharacterRef.current) {
+        const deltaX = event.clientX - lastMousePositionRef.current.x;
+        const deltaY = event.clientY - lastMousePositionRef.current.y;
+
+        // Adjust offset based on mouse movement
+        // Scale factor for sensitivity (adjust as needed)
+        const sensitivity = 0.005;
+        cameraFollowOffsetRef.current.x += deltaX * sensitivity;
+        cameraFollowOffsetRef.current.y -= deltaY * sensitivity; // Inverted Y for intuitive control
+
+        lastMousePositionRef.current = { x: event.clientX, y: event.clientY };
+        event.preventDefault();
+      }
+    };
+
+    const handleMouseUp = (event: MouseEvent) => {
+      if (event.button === 2) {
+        isRightMouseDownRef.current = false;
+      }
+    };
+
+    const handleContextMenu = (event: MouseEvent) => {
+      if (cameraFollowCharacterRef.current) {
+        event.preventDefault(); // Prevent context menu when camera follow is active
+      }
+    };
+
+    canvas.addEventListener("mousedown", handleMouseDown);
+    canvas.addEventListener("mousemove", handleMouseMove);
+    canvas.addEventListener("mouseup", handleMouseUp);
+    canvas.addEventListener("contextmenu", handleContextMenu);
+
     // Cleanup
     return () => {
       window.removeEventListener("resize", handleResize);
+      canvas.removeEventListener("mousedown", handleMouseDown);
+      canvas.removeEventListener("mousemove", handleMouseMove);
+      canvas.removeEventListener("mouseup", handleMouseUp);
+      canvas.removeEventListener("contextmenu", handleContextMenu);
       canvas.removeEventListener(
         "webglcontextlost",
         handleContextLost as EventListener
