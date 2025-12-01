@@ -150,6 +150,21 @@ export const VRMViewer = forwardRef<VRMViewerRef>((_, ref) => {
         const currentLoadingId = loadingIdRef.current;
         console.log("🔄 Starting model load #" + currentLoadingId);
 
+        // Check model size on mobile devices
+        const isMobile = /iPhone|iPad|iPod|Android/i.test(navigator.userAgent);
+        if (isMobile && arrayBufferOrUrl instanceof ArrayBuffer) {
+          const sizeInMB = arrayBufferOrUrl.byteLength / (1024 * 1024);
+          console.log(`📦 Model size: ${sizeInMB.toFixed(2)}MB`);
+          if (sizeInMB > 15) {
+            // Warning for large models on mobile
+            console.warn(
+              `⚠️ Large model (${sizeInMB.toFixed(
+                1
+              )}MB) may cause performance issues on mobile`
+            );
+          }
+        }
+
         // FIRST: Revoke old blob URLs from previous uploads
         // This is safe because we're about to clear the old model
         if (activeBlobUrlsRef.current.size > 0) {
@@ -403,6 +418,33 @@ export const VRMViewer = forwardRef<VRMViewerRef>((_, ref) => {
     const container = canvasRef.current.parentElement;
     if (!container) return;
 
+    // Check WebGL support FIRST
+    const testCanvas = document.createElement("canvas");
+    const gl =
+      testCanvas.getContext("webgl") ||
+      (testCanvas.getContext(
+        "experimental-webgl"
+      ) as WebGLRenderingContext | null);
+
+    if (!gl) {
+      console.error("❌ WebGL not supported!");
+      const errorDiv = document.createElement("div");
+      errorDiv.className =
+        "absolute inset-0 flex items-center justify-center bg-black/50 text-white z-50";
+      errorDiv.innerHTML =
+        '<div class="text-center p-8"><h2 class="text-2xl font-bold text-red-500 mb-4">WebGL Not Supported</h2><p>Your device does not support WebGL. 3D features will not work.</p></div>';
+      container.appendChild(errorDiv);
+      return;
+    }
+
+    console.log("✅ WebGL supported");
+    console.log("📱 Device info:", {
+      userAgent: navigator.userAgent,
+      maxTextureSize: gl.getParameter(gl.MAX_TEXTURE_SIZE),
+      maxRenderbufferSize: gl.getParameter(gl.MAX_RENDERBUFFER_SIZE),
+      isMobile: /iPhone|iPad|iPod|Android/i.test(navigator.userAgent),
+    });
+
     // Capture blob URLs set for cleanup
     const blobUrlsToCleanup = activeBlobUrlsRef.current;
 
@@ -414,18 +456,46 @@ export const VRMViewer = forwardRef<VRMViewerRef>((_, ref) => {
 
     const { width, height } = getContainerSize();
 
-    // Setup renderer
+    // Detect mobile device
+    const isMobile = /iPhone|iPad|iPod|Android/i.test(navigator.userAgent);
+
+    // Setup renderer with mobile optimizations
     const renderer = new THREE.WebGLRenderer({
       canvas: canvasRef.current,
       alpha: true,
-      antialias: true,
+      antialias: !isMobile, // Disable antialiasing on mobile for performance
+      powerPreference: "high-performance",
+      failIfMajorPerformanceCaveat: false, // Don't fail on slow devices
     });
     renderer.setSize(width, height);
-    renderer.setPixelRatio(window.devicePixelRatio);
+    renderer.setPixelRatio(Math.min(window.devicePixelRatio, isMobile ? 2 : 3)); // Limit pixel ratio on mobile
     renderer.outputColorSpace = THREE.SRGBColorSpace;
 
-    // Setup camera
-    const camera = new THREE.PerspectiveCamera(30.0, width / height, 0.1, 20.0);
+    // Add WebGL context loss/restore handlers
+    const canvas = canvasRef.current;
+
+    const handleContextLost = (event: Event) => {
+      event.preventDefault();
+      console.error("⚠️ WebGL context lost!");
+    };
+
+    const handleContextRestored = () => {
+      console.log("✅ WebGL context restored");
+      // Reinitialize if needed
+    };
+
+    canvas.addEventListener(
+      "webglcontextlost",
+      handleContextLost as EventListener
+    );
+    canvas.addEventListener(
+      "webglcontextrestored",
+      handleContextRestored as EventListener
+    );
+
+    // Setup camera with mobile-optimized FOV
+    const fov = isMobile ? 45.0 : 30.0; // Wider FOV for mobile
+    const camera = new THREE.PerspectiveCamera(fov, width / height, 0.1, 20.0);
     camera.position.set(0.0, 1.0, 5.0);
     cameraRef.current = camera;
 
@@ -526,6 +596,14 @@ export const VRMViewer = forwardRef<VRMViewerRef>((_, ref) => {
     // Cleanup
     return () => {
       window.removeEventListener("resize", handleResize);
+      canvas.removeEventListener(
+        "webglcontextlost",
+        handleContextLost as EventListener
+      );
+      canvas.removeEventListener(
+        "webglcontextrestored",
+        handleContextRestored as EventListener
+      );
       renderer.dispose();
       controls.dispose();
       scene.clear();

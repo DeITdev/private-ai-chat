@@ -12,6 +12,7 @@ import {
   Home,
   Upload,
   ChevronDown,
+  Menu,
 } from "lucide-react";
 import { predefinedAvatars, predefinedAnimations } from "~/constants";
 import { Button } from "~/components/ui/button";
@@ -27,8 +28,10 @@ import {
   DialogContent,
   DialogHeader,
   DialogTitle,
+  DialogDescription,
 } from "~/components/ui/dialog";
 import { useNavigate } from "react-router-dom";
+import { useSidebar } from "~/components/ui/sidebar";
 import ollama from "ollama";
 
 const AvatarPage = () => {
@@ -40,11 +43,13 @@ const AvatarPage = () => {
   const [loadingProgress, setLoadingProgress] = useState(0);
   const [isLoading, setIsLoading] = useState(false);
   const [showSkipButton, setShowSkipButton] = useState(false);
+  const [error, setError] = useState<string | null>(null);
   const [showAvatarModal, setShowAvatarModal] = useState(false);
   const [isLoadingAvatar, setIsLoadingAvatar] = useState(false);
   const [selectedAvatar, setSelectedAvatar] = useState(
     "/models/HatsuneMikuNT.vrm"
   );
+  const [hasLoadedInitially, setHasLoadedInitially] = useState(false);
   const [showAnimationModal, setShowAnimationModal] = useState(false);
   const [isLoadingAnimation, setIsLoadingAnimation] = useState(false);
   const [selectedAnimation, setSelectedAnimation] = useState(
@@ -66,6 +71,7 @@ const AvatarPage = () => {
   const skipTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   const loadCancelledRef = useRef(false);
   const audioPermissionRequestedRef = useRef(false);
+  const { toggleSidebar } = useSidebar();
 
   const handleSkipLoading = () => {
     console.log("⏭️ User skipped loading");
@@ -339,6 +345,7 @@ const AvatarPage = () => {
         setIsLoading(false);
         setIsVRMLoaded(true);
         setSelectedAvatar(avatarPath);
+        setHasLoadedInitially(true); // Mark as loaded to prevent useEffect from re-running
         setIsLoadingAvatar(false);
         setShowAvatarModal(false);
         console.log("✅ Avatar switched successfully!");
@@ -429,8 +436,38 @@ const AvatarPage = () => {
 
   // Audio permission will be requested on first record button press
 
+  // Global error handling for debugging mobile issues
+  useEffect(() => {
+    const handleError = (event: ErrorEvent) => {
+      console.error("🔴 Global error:", event.error);
+      setError(event.message || "An error occurred");
+    };
+
+    const handleUnhandledRejection = (event: PromiseRejectionEvent) => {
+      console.error("🔴 Unhandled rejection:", event.reason);
+      setError(String(event.reason));
+    };
+
+    window.addEventListener("error", handleError);
+    window.addEventListener("unhandledrejection", handleUnhandledRejection);
+
+    return () => {
+      window.removeEventListener("error", handleError);
+      window.removeEventListener(
+        "unhandledrejection",
+        handleUnhandledRejection
+      );
+    };
+  }, []);
+
   // Enumerate audio devices
   useEffect(() => {
+    // Check if mediaDevices API is available (may not be on some mobile browsers)
+    if (!navigator.mediaDevices || !navigator.mediaDevices.enumerateDevices) {
+      console.warn("⚠️ MediaDevices API not available on this device");
+      return;
+    }
+
     const enumerateDevices = async () => {
       try {
         const devices = await navigator.mediaDevices.enumerateDevices();
@@ -448,17 +485,25 @@ const AvatarPage = () => {
 
     enumerateDevices();
 
-    navigator.mediaDevices.addEventListener("devicechange", enumerateDevices);
+    if (navigator.mediaDevices.addEventListener) {
+      navigator.mediaDevices.addEventListener("devicechange", enumerateDevices);
+    }
+
     return () => {
-      navigator.mediaDevices.removeEventListener(
-        "devicechange",
-        enumerateDevices
-      );
+      if (navigator.mediaDevices?.removeEventListener) {
+        navigator.mediaDevices.removeEventListener(
+          "devicechange",
+          enumerateDevices
+        );
+      }
     };
   }, [selectedInputId]);
 
   // Initial load: show loading overlay and progress for default model
   useEffect(() => {
+    // Only load on initial mount, not when selectedAvatar changes
+    if (hasLoadedInitially) return;
+
     let cancelled = false;
     const loadDefaultModel = async () => {
       if (vrmViewerRef.current) {
@@ -483,6 +528,7 @@ const AvatarPage = () => {
           if (!cancelled && !loadCancelledRef.current) {
             setIsLoading(false);
             setIsVRMLoaded(true);
+            setHasLoadedInitially(true);
             setShowSkipButton(false);
             if (skipTimeoutRef.current) {
               clearTimeout(skipTimeoutRef.current);
@@ -504,7 +550,8 @@ const AvatarPage = () => {
         clearTimeout(skipTimeoutRef.current);
       }
     };
-  }, [selectedAvatar]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []); // Only run on mount
 
   // Periodic blink idle animation
   useEffect(() => {
@@ -589,7 +636,20 @@ const AvatarPage = () => {
   }, [cameraFollowCharacter]);
 
   return (
-    <div className="flex flex-col flex-1 h-screen relative overflow-hidden">
+    <div className="flex flex-col h-screen w-full fixed inset-0 overflow-hidden lg:pl-64">
+      {/* Error Display */}
+      {error && (
+        <div className="absolute inset-0 bg-black/80 backdrop-blur-sm z-[60] flex items-center justify-center">
+          <div className="text-center space-y-4 p-8 bg-background/90 rounded-lg max-w-md">
+            <h2 className="text-2xl font-bold text-red-500">Error</h2>
+            <p className="text-sm text-foreground">{error}</p>
+            <Button onClick={() => setError(null)} variant="outline">
+              Dismiss
+            </Button>
+          </div>
+        </div>
+      )}
+
       {/* Loading Overlay */}
       {isLoading && (
         <div className="absolute inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-center justify-center">
@@ -617,19 +677,31 @@ const AvatarPage = () => {
         </div>
       )}
 
-      <header className="absolute top-0 left-0 right-0 flex items-center justify-between px-4 h-16 border-b bg-background/80 backdrop-blur-sm z-10">
-        <h1 className="text-xl font-bold">3D Avatar Viewer</h1>
+      <header className="absolute top-0 left-0 right-0 flex items-center justify-between px-4 h-16 border-b bg-background/80 backdrop-blur-sm z-10 lg:left-64">
+        <div className="flex items-center gap-2 lg:gap-2 w-full lg:w-auto">
+          <Button
+            variant="ghost"
+            size="icon"
+            onClick={toggleSidebar}
+            className="lg:hidden"
+          >
+            <Menu className="h-6 w-6" />
+          </Button>
+          <h1 className="text-xl font-bold absolute left-1/2 -translate-x-1/2 lg:static lg:translate-x-0">
+            3D Avatar Viewer
+          </h1>
+        </div>
 
-        {/* Settings Dropdown */}
+        {/* Desktop Settings Dropdown - Hidden on Mobile */}
         <DropdownMenu>
           <DropdownMenuTrigger asChild>
             <Button
               variant="outline"
               size="sm"
-              className="text-base font-semibold"
+              className="text-base font-semibold max-md:w-10 max-md:h-10 max-md:p-0"
             >
-              Settings
-              <SettingsIcon className="ml-2 h-4 w-4" />
+              <span className="max-md:hidden">Settings</span>
+              <SettingsIcon className="md:ml-2 h-4 w-4" />
             </Button>
           </DropdownMenuTrigger>
           <DropdownMenuContent align="end" className="w-56">
@@ -677,7 +749,7 @@ const AvatarPage = () => {
       <main className="flex-1 w-full overflow-hidden">
         <VRMViewer ref={vrmViewerRef} />
       </main>
-      <footer className="absolute bottom-0 left-0 right-0 z-10 flex justify-center items-end pb-4">
+      <footer className="absolute bottom-0 left-0 right-0 z-10 flex justify-center items-end pb-4 lg:left-64">
         {/* Dock with Action Buttons */}
         <Dock magnification={100} distance={140}>
           {/* Home Button */}
@@ -774,9 +846,15 @@ const AvatarPage = () => {
 
       {/* 3D Avatar Selection Modal */}
       <Dialog open={showAvatarModal} onOpenChange={setShowAvatarModal}>
-        <DialogContent className="sm:max-w-[600px]">
+        <DialogContent
+          className="sm:max-w-[600px]"
+          aria-describedby="avatar-dialog-description"
+        >
           <DialogHeader>
             <DialogTitle>Select 3D Avatar</DialogTitle>
+            <DialogDescription id="avatar-dialog-description">
+              Choose from the available 3D avatars below
+            </DialogDescription>
           </DialogHeader>
           {isLoadingAvatar && (
             <div className="absolute inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-center justify-center rounded-lg">
@@ -818,9 +896,15 @@ const AvatarPage = () => {
 
       {/* Animation Selection Modal */}
       <Dialog open={showAnimationModal} onOpenChange={setShowAnimationModal}>
-        <DialogContent className="sm:max-w-[600px]">
+        <DialogContent
+          className="sm:max-w-[600px]"
+          aria-describedby="animation-dialog-description"
+        >
           <DialogHeader>
             <DialogTitle>Select Animation</DialogTitle>
+            <DialogDescription id="animation-dialog-description">
+              Choose from the available animations below
+            </DialogDescription>
           </DialogHeader>
           {isLoadingAnimation && (
             <div className="absolute inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-center justify-center rounded-lg">

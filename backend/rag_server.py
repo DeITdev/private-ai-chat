@@ -194,7 +194,7 @@ def query_rag():
                 results['distances'][0]
             )):
                 relevance_score = 1 - distance  # Convert distance to similarity
-                
+
                 # Only include results above relevance threshold
                 if relevance_score >= RELEVANCE_THRESHOLD:
                     contexts.append({
@@ -212,7 +212,8 @@ def query_rag():
 
         print(f"\n=== RAG Query ===")
         print(f"Query: {query}")
-        print(f"Found {len(contexts)} relevant chunks (threshold: {RELEVANCE_THRESHOLD})")
+        print(
+            f"Found {len(contexts)} relevant chunks (threshold: {RELEVANCE_THRESHOLD})")
         if contexts:
             print(
                 f"Top source: {contexts[0]['source']} (relevance: {contexts[0]['relevance_score']:.3f})")
