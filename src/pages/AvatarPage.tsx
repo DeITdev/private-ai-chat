@@ -639,7 +639,7 @@ const AvatarPage = () => {
     <div className="flex flex-col h-screen w-full fixed inset-0 overflow-hidden lg:pl-64">
       {/* Error Display */}
       {error && (
-        <div className="absolute inset-0 bg-black/80 backdrop-blur-sm z-[60] flex items-center justify-center">
+        <div className="absolute inset-0 bg-black/80 backdrop-blur-sm z-[60] flex items-center justify-center lg:left-64">
           <div className="text-center space-y-4 p-8 bg-background/90 rounded-lg max-w-md">
             <h2 className="text-2xl font-bold text-red-500">Error</h2>
             <p className="text-sm text-foreground">{error}</p>
@@ -652,7 +652,7 @@ const AvatarPage = () => {
 
       {/* Loading Overlay */}
       {isLoading && (
-        <div className="absolute inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-center justify-center">
+        <div className="absolute inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-center justify-center lg:left-64">
           <div className="text-center space-y-4">
             <div className="text-6xl font-bold text-white">
               {loadingProgress}%
