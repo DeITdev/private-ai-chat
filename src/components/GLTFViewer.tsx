@@ -4,12 +4,35 @@ import {
   forwardRef,
   useImperativeHandle,
   useCallback,
+  useState,
 } from "react";
 import * as THREE from "three";
 import { GLTFLoader, GLTF } from "three/addons/loaders/GLTFLoader.js";
 import { OrbitControls } from "three/addons/controls/OrbitControls.js";
 import { DRACOLoader } from "three/addons/loaders/DRACOLoader.js";
-import * as dat from "dat.gui";
+import {
+  Accordion,
+  AccordionContent,
+  AccordionItem,
+  AccordionTrigger,
+} from "~/components/ui/accordion";
+import { Checkbox } from "~/components/ui/checkbox";
+import { Slider } from "~/components/ui/slider";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "~/components/ui/select";
+import {
+  Popover,
+  PopoverContent,
+  PopoverTrigger,
+} from "~/components/ui/popover";
+import { Input } from "~/components/ui/input";
+import { Button } from "~/components/ui/button";
+import { Label } from "~/components/ui/label";
 
 export interface GLTFViewerRef {
   loadGLTF: (
@@ -86,8 +109,27 @@ export const GLTFViewer = forwardRef<GLTFViewerRef, GLTFViewerProps>(
     const gridHelperRef = useRef<THREE.GridHelper | null>(null);
     const axesHelperRef = useRef<THREE.AxesHelper | null>(null);
     const clockRef = useRef<THREE.Clock>(new THREE.Clock());
-    const guiRef = useRef<dat.GUI | null>(null);
     const skeletonHelpersRef = useRef<THREE.SkeletonHelper[]>([]);
+
+    // UI State
+    const [background, setBackground] = useState(false);
+    const [playbackSpeed, setPlaybackSpeed] = useState(1.0);
+    const [wireframe, setWireframe] = useState(false);
+    const [skeleton, setSkeleton] = useState(false);
+    const [grid, setGrid] = useState(true);
+    const [autoRotate, setAutoRotate] = useState(false);
+    const [punctualLights, setPunctualLights] = useState(true);
+    const [exposure, setExposure] = useState(0.0);
+    const [toneMapping, setToneMapping] = useState<string>("Linear");
+    const [ambientIntensity, setAmbientIntensity] = useState(0.3);
+    const [ambientColor, setAmbientColor] = useState("#FFFFFF");
+    const [directIntensity, setDirectIntensity] = useState(0.8 * Math.PI);
+    const [directColor, setDirectColor] = useState("#FFFFFF");
+    const [bgColor, setBgColor] = useState(
+      theme === "light" ? "#f2f2f2" : "#191919"
+    );
+    const [pointSize, setPointSize] = useState(1.0);
+    const [showControls, setShowControls] = useState(true);
 
     const stateRef = useRef({
       background: false,
@@ -98,7 +140,7 @@ export const GLTFViewer = forwardRef<GLTFViewerRef, GLTFViewerProps>(
       autoRotate: false,
       punctualLights: true,
       exposure: 0.0,
-      toneMapping: THREE.LinearToneMapping,
+      toneMapping: THREE.LinearToneMapping as THREE.ToneMapping,
       ambientIntensity: 0.3,
       ambientColor: "#FFFFFF",
       directIntensity: 0.8 * Math.PI,
@@ -107,6 +149,44 @@ export const GLTFViewer = forwardRef<GLTFViewerRef, GLTFViewerProps>(
       pointSize: 1.0,
       screenSpacePanning: true,
     });
+
+    // Sync state to stateRef for rendering
+    useEffect(() => {
+      stateRef.current.background = background;
+      stateRef.current.playbackSpeed = playbackSpeed;
+      stateRef.current.wireframe = wireframe;
+      stateRef.current.skeleton = skeleton;
+      stateRef.current.grid = grid;
+      stateRef.current.autoRotate = autoRotate;
+      stateRef.current.punctualLights = punctualLights;
+      stateRef.current.exposure = exposure;
+      stateRef.current.toneMapping =
+        toneMapping === "ACES Filmic"
+          ? THREE.ACESFilmicToneMapping
+          : THREE.LinearToneMapping;
+      stateRef.current.ambientIntensity = ambientIntensity;
+      stateRef.current.ambientColor = ambientColor;
+      stateRef.current.directIntensity = directIntensity;
+      stateRef.current.directColor = directColor;
+      stateRef.current.bgColor = bgColor;
+      stateRef.current.pointSize = pointSize;
+    }, [
+      background,
+      playbackSpeed,
+      wireframe,
+      skeleton,
+      grid,
+      autoRotate,
+      punctualLights,
+      exposure,
+      toneMapping,
+      ambientIntensity,
+      ambientColor,
+      directIntensity,
+      directColor,
+      bgColor,
+      pointSize,
+    ]);
 
     const updateLights = useCallback(() => {
       const state = stateRef.current;
@@ -213,95 +293,6 @@ export const GLTFViewer = forwardRef<GLTFViewerRef, GLTFViewerProps>(
         action.reset().play();
       });
     }, []);
-
-    const addGUI = useCallback(() => {
-      if (guiRef.current) {
-        guiRef.current.destroy();
-      }
-
-      const gui = new dat.GUI({
-        autoPlace: false,
-        width: 260,
-        hideable: true,
-      });
-      guiRef.current = gui;
-
-      // Display controls
-      const dispFolder = gui.addFolder("Display");
-      dispFolder
-        .add(stateRef.current, "background")
-        .onChange(updateEnvironment);
-      dispFolder.add(stateRef.current, "autoRotate").onChange(updateDisplay);
-      dispFolder.add(stateRef.current, "wireframe").onChange(updateDisplay);
-      dispFolder.add(stateRef.current, "skeleton").onChange(updateDisplay);
-      dispFolder.add(stateRef.current, "grid").onChange(updateDisplay);
-      if (controlsRef.current) {
-        dispFolder.add(controlsRef.current, "screenSpacePanning");
-      }
-      dispFolder
-        .add(stateRef.current, "pointSize", 1, 16)
-        .onChange(updateDisplay);
-      dispFolder
-        .addColor(stateRef.current, "bgColor")
-        .onChange(updateBackground);
-      dispFolder.open();
-
-      // Lighting controls
-      const lightFolder = gui.addFolder("Lighting");
-      lightFolder
-        .add(stateRef.current, "toneMapping", {
-          Linear: THREE.LinearToneMapping,
-          "ACES Filmic": THREE.ACESFilmicToneMapping,
-        })
-        .onChange(updateLights);
-      lightFolder
-        .add(stateRef.current, "exposure", -10, 10, 0.01)
-        .onChange(updateLights);
-      lightFolder
-        .add(stateRef.current, "punctualLights")
-        .listen()
-        .onChange(updateLights);
-      lightFolder
-        .add(stateRef.current, "ambientIntensity", 0, 2)
-        .onChange(updateLights);
-      lightFolder
-        .addColor(stateRef.current, "ambientColor")
-        .onChange(updateLights);
-      lightFolder
-        .add(stateRef.current, "directIntensity", 0, 4)
-        .onChange(updateLights);
-      lightFolder
-        .addColor(stateRef.current, "directColor")
-        .onChange(updateLights);
-      lightFolder.open();
-
-      // Animation controls
-      const animFolder = gui.addFolder("Animation");
-      animFolder
-        .add(stateRef.current, "playbackSpeed", 0, 1)
-        .onChange((speed: number) => {
-          if (mixerRef.current) mixerRef.current.timeScale = speed;
-        });
-      animFolder.add({ playAll: () => playAllClips() }, "playAll");
-
-      // Append GUI to canvas parent
-      const container = canvasRef.current?.parentElement;
-      if (container) {
-        const guiWrap = document.createElement("div");
-        guiWrap.style.position = "absolute";
-        guiWrap.style.top = "80px";
-        guiWrap.style.right = "16px";
-        guiWrap.style.zIndex = "100";
-        guiWrap.appendChild(gui.domElement);
-        container.appendChild(guiWrap);
-      }
-    }, [
-      updateLights,
-      updateDisplay,
-      updateBackground,
-      updateEnvironment,
-      playAllClips,
-    ]);
 
     useImperativeHandle(ref, () => ({
       clearScene: () => {
@@ -675,9 +666,6 @@ export const GLTFViewer = forwardRef<GLTFViewerRef, GLTFViewerProps>(
       loader.setDRACOLoader(dracoLoader);
       loaderRef.current = loader;
 
-      // Add GUI controls
-      addGUI();
-
       // Animation loop
       const animate = () => {
         requestAnimationFrame(animate);
@@ -718,18 +706,13 @@ export const GLTFViewer = forwardRef<GLTFViewerRef, GLTFViewerProps>(
         if (neutralEnvRef.current) {
           neutralEnvRef.current.dispose();
         }
-
-        // Destroy GUI
-        if (guiRef.current) {
-          guiRef.current.destroy();
-          guiRef.current = null;
-        }
       };
-    }, [addGUI]);
+    }, []);
 
     // Update background color when theme changes
     useEffect(() => {
       const newBgColor = theme === "light" ? "#f2f2f2" : "#191919";
+      setBgColor(newBgColor);
       stateRef.current.bgColor = newBgColor;
 
       if (sceneRef.current) {
@@ -738,11 +721,410 @@ export const GLTFViewer = forwardRef<GLTFViewerRef, GLTFViewerProps>(
     }, [theme]);
 
     return (
-      <canvas
-        ref={canvasRef}
-        className="w-full h-full"
-        style={{ display: "block" }}
-      />
+      <div className="relative w-full h-full">
+        <canvas
+          ref={canvasRef}
+          className="w-full h-full"
+          style={{ display: "block" }}
+        />
+
+        {/* shadcn UI Controls Panel */}
+        {showControls ? (
+          <div className="absolute top-20 right-4 w-[280px] max-h-[calc(100%-100px)] overflow-y-auto bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/90 border rounded-lg shadow-lg z-[100]">
+            <Accordion
+              type="multiple"
+              defaultValue={["display", "lighting", "animation"]}
+              className="w-full"
+            >
+              {/* Display Controls */}
+              <AccordionItem value="display">
+                <AccordionTrigger className="px-4 py-3 text-sm font-semibold">
+                  Display
+                </AccordionTrigger>
+                <AccordionContent className="px-4 pb-4 space-y-4">
+                  <div className="flex items-center justify-between">
+                    <Label htmlFor="background" className="text-sm">
+                      Background
+                    </Label>
+                    <Checkbox
+                      id="background"
+                      checked={background}
+                      onCheckedChange={(checked) => {
+                        setBackground(!!checked);
+                        updateEnvironment();
+                      }}
+                    />
+                  </div>
+
+                  <div className="flex items-center justify-between">
+                    <Label htmlFor="autoRotate" className="text-sm">
+                      Auto Rotate
+                    </Label>
+                    <Checkbox
+                      id="autoRotate"
+                      checked={autoRotate}
+                      onCheckedChange={(checked) => {
+                        setAutoRotate(!!checked);
+                        updateDisplay();
+                      }}
+                    />
+                  </div>
+
+                  <div className="flex items-center justify-between">
+                    <Label htmlFor="wireframe" className="text-sm">
+                      Wireframe
+                    </Label>
+                    <Checkbox
+                      id="wireframe"
+                      checked={wireframe}
+                      onCheckedChange={(checked) => {
+                        setWireframe(!!checked);
+                        updateDisplay();
+                      }}
+                    />
+                  </div>
+
+                  <div className="flex items-center justify-between">
+                    <Label htmlFor="skeleton" className="text-sm">
+                      Skeleton
+                    </Label>
+                    <Checkbox
+                      id="skeleton"
+                      checked={skeleton}
+                      onCheckedChange={(checked) => {
+                        setSkeleton(!!checked);
+                        updateDisplay();
+                      }}
+                    />
+                  </div>
+
+                  <div className="flex items-center justify-between">
+                    <Label htmlFor="grid" className="text-sm">
+                      Grid
+                    </Label>
+                    <Checkbox
+                      id="grid"
+                      checked={grid}
+                      onCheckedChange={(checked) => {
+                        setGrid(!!checked);
+                        updateDisplay();
+                      }}
+                    />
+                  </div>
+
+                  <div className="space-y-2">
+                    <Label htmlFor="pointSize" className="text-sm">
+                      Point Size: {pointSize.toFixed(1)}
+                    </Label>
+                    <Slider
+                      id="pointSize"
+                      min={1}
+                      max={16}
+                      step={0.1}
+                      value={[pointSize]}
+                      onValueChange={([value]) => {
+                        setPointSize(value);
+                        updateDisplay();
+                      }}
+                    />
+                  </div>
+
+                  <div className="space-y-2">
+                    <Label htmlFor="bgColor" className="text-sm">
+                      Background Color
+                    </Label>
+                    <Popover>
+                      <PopoverTrigger asChild>
+                        <Button
+                          variant="outline"
+                          className="w-full justify-start text-left font-normal"
+                        >
+                          <div
+                            className="w-4 h-4 rounded border mr-2"
+                            style={{ backgroundColor: bgColor }}
+                          />
+                          <span className="text-xs">{bgColor}</span>
+                        </Button>
+                      </PopoverTrigger>
+                      <PopoverContent className="w-64">
+                        <div className="space-y-2">
+                          <Label htmlFor="bgColorInput" className="text-sm">
+                            Choose Color
+                          </Label>
+                          <Input
+                            id="bgColorInput"
+                            type="color"
+                            value={bgColor}
+                            onChange={(e) => {
+                              setBgColor(e.target.value);
+                              updateBackground();
+                            }}
+                            className="h-10 cursor-pointer"
+                          />
+                          <Input
+                            type="text"
+                            value={bgColor}
+                            onChange={(e) => {
+                              setBgColor(e.target.value);
+                              updateBackground();
+                            }}
+                            className="font-mono text-xs"
+                          />
+                        </div>
+                      </PopoverContent>
+                    </Popover>
+                  </div>
+                </AccordionContent>
+              </AccordionItem>
+
+              {/* Lighting Controls */}
+              <AccordionItem value="lighting">
+                <AccordionTrigger className="px-4 py-3 text-sm font-semibold">
+                  Lighting
+                </AccordionTrigger>
+                <AccordionContent className="px-4 pb-4 space-y-4">
+                  <div className="space-y-2">
+                    <Label htmlFor="toneMapping" className="text-sm">
+                      Tone Mapping
+                    </Label>
+                    <Select
+                      value={toneMapping}
+                      onValueChange={(value) => {
+                        setToneMapping(value);
+                        updateLights();
+                      }}
+                    >
+                      <SelectTrigger id="toneMapping">
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="Linear">Linear</SelectItem>
+                        <SelectItem value="ACES Filmic">ACES Filmic</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+
+                  <div className="space-y-2">
+                    <Label htmlFor="exposure" className="text-sm">
+                      Exposure: {exposure.toFixed(2)}
+                    </Label>
+                    <Slider
+                      id="exposure"
+                      min={-10}
+                      max={10}
+                      step={0.01}
+                      value={[exposure]}
+                      onValueChange={([value]) => {
+                        setExposure(value);
+                        updateLights();
+                      }}
+                    />
+                  </div>
+
+                  <div className="flex items-center justify-between">
+                    <Label htmlFor="punctualLights" className="text-sm">
+                      Punctual Lights
+                    </Label>
+                    <Checkbox
+                      id="punctualLights"
+                      checked={punctualLights}
+                      onCheckedChange={(checked) => {
+                        setPunctualLights(!!checked);
+                        updateLights();
+                      }}
+                    />
+                  </div>
+
+                  <div className="space-y-2">
+                    <Label htmlFor="ambientIntensity" className="text-sm">
+                      Ambient Intensity: {ambientIntensity.toFixed(2)}
+                    </Label>
+                    <Slider
+                      id="ambientIntensity"
+                      min={0}
+                      max={2}
+                      step={0.01}
+                      value={[ambientIntensity]}
+                      onValueChange={([value]) => {
+                        setAmbientIntensity(value);
+                        updateLights();
+                      }}
+                    />
+                  </div>
+
+                  <div className="space-y-2">
+                    <Label htmlFor="ambientColor" className="text-sm">
+                      Ambient Color
+                    </Label>
+                    <Popover>
+                      <PopoverTrigger asChild>
+                        <Button
+                          variant="outline"
+                          className="w-full justify-start text-left font-normal"
+                        >
+                          <div
+                            className="w-4 h-4 rounded border mr-2"
+                            style={{ backgroundColor: ambientColor }}
+                          />
+                          <span className="text-xs">{ambientColor}</span>
+                        </Button>
+                      </PopoverTrigger>
+                      <PopoverContent className="w-64">
+                        <div className="space-y-2">
+                          <Label
+                            htmlFor="ambientColorInput"
+                            className="text-sm"
+                          >
+                            Choose Color
+                          </Label>
+                          <Input
+                            id="ambientColorInput"
+                            type="color"
+                            value={ambientColor}
+                            onChange={(e) => {
+                              setAmbientColor(e.target.value);
+                              updateLights();
+                            }}
+                            className="h-10 cursor-pointer"
+                          />
+                          <Input
+                            type="text"
+                            value={ambientColor}
+                            onChange={(e) => {
+                              setAmbientColor(e.target.value);
+                              updateLights();
+                            }}
+                            className="font-mono text-xs"
+                          />
+                        </div>
+                      </PopoverContent>
+                    </Popover>
+                  </div>
+
+                  <div className="space-y-2">
+                    <Label htmlFor="directIntensity" className="text-sm">
+                      Direct Intensity: {directIntensity.toFixed(2)}
+                    </Label>
+                    <Slider
+                      id="directIntensity"
+                      min={0}
+                      max={4}
+                      step={0.01}
+                      value={[directIntensity]}
+                      onValueChange={([value]) => {
+                        setDirectIntensity(value);
+                        updateLights();
+                      }}
+                    />
+                  </div>
+
+                  <div className="space-y-2">
+                    <Label htmlFor="directColor" className="text-sm">
+                      Direct Color
+                    </Label>
+                    <Popover>
+                      <PopoverTrigger asChild>
+                        <Button
+                          variant="outline"
+                          className="w-full justify-start text-left font-normal"
+                        >
+                          <div
+                            className="w-4 h-4 rounded border mr-2"
+                            style={{ backgroundColor: directColor }}
+                          />
+                          <span className="text-xs">{directColor}</span>
+                        </Button>
+                      </PopoverTrigger>
+                      <PopoverContent className="w-64">
+                        <div className="space-y-2">
+                          <Label htmlFor="directColorInput" className="text-sm">
+                            Choose Color
+                          </Label>
+                          <Input
+                            id="directColorInput"
+                            type="color"
+                            value={directColor}
+                            onChange={(e) => {
+                              setDirectColor(e.target.value);
+                              updateLights();
+                            }}
+                            className="h-10 cursor-pointer"
+                          />
+                          <Input
+                            type="text"
+                            value={directColor}
+                            onChange={(e) => {
+                              setDirectColor(e.target.value);
+                              updateLights();
+                            }}
+                            className="font-mono text-xs"
+                          />
+                        </div>
+                      </PopoverContent>
+                    </Popover>
+                  </div>
+                </AccordionContent>
+              </AccordionItem>
+
+              {/* Animation Controls */}
+              <AccordionItem value="animation">
+                <AccordionTrigger className="px-4 py-3 text-sm font-semibold">
+                  Animation
+                </AccordionTrigger>
+                <AccordionContent className="px-4 pb-4 space-y-4">
+                  <div className="space-y-2">
+                    <Label htmlFor="playbackSpeed" className="text-sm">
+                      Playback Speed: {playbackSpeed.toFixed(2)}
+                    </Label>
+                    <Slider
+                      id="playbackSpeed"
+                      min={0}
+                      max={1}
+                      step={0.01}
+                      value={[playbackSpeed]}
+                      onValueChange={([value]) => {
+                        setPlaybackSpeed(value);
+                        if (mixerRef.current)
+                          mixerRef.current.timeScale = value;
+                      }}
+                    />
+                  </div>
+
+                  <Button
+                    onClick={playAllClips}
+                    variant="outline"
+                    className="w-full"
+                  >
+                    Play All
+                  </Button>
+                </AccordionContent>
+              </AccordionItem>
+            </Accordion>
+
+            {/* Close Control Button */}
+            <div className="p-4 border-t">
+              <Button
+                onClick={() => setShowControls(false)}
+                variant="outline"
+                className="w-full"
+              >
+                Close Control
+              </Button>
+            </div>
+          </div>
+        ) : (
+          /* Open Control Button */
+          <div className="absolute top-20 right-4 z-[100]">
+            <Button
+              onClick={() => setShowControls(true)}
+              variant="default"
+              size="sm"
+            >
+              Open Control
+            </Button>
+          </div>
+        )}
+      </div>
     );
   }
 );
