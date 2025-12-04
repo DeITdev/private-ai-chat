@@ -6,19 +6,60 @@ import {
   DockItem,
   DockLabel,
 } from "~/components/ui/shadcn-io/dock";
-import { Home, Upload, Menu } from "lucide-react";
+import {
+  Home,
+  Upload,
+  Menu,
+  Mic,
+  Settings as SettingsIcon,
+  ChevronDown,
+} from "lucide-react";
 import { Button } from "~/components/ui/button";
-import { useNavigate } from "react-router-dom";
+import { Switch } from "~/components/ui/switch";
+import { Separator } from "~/components/ui/separator";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuTrigger,
+  DropdownMenuRadioItem,
+} from "~/components/ui/dropdown-menu";
+import { Tabs, TabsList, TabsTrigger } from "~/components/ui/tabs";
+import { predefinedAvatars, predefinedAnimations } from "~/constants";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogDescription,
+} from "~/components/ui/dialog";
+import { useNavigate, useLocation } from "react-router-dom";
 import { useSidebar } from "~/components/ui/sidebar";
 import { useTheme } from "~/components/ThemeProvider";
 
 const AvatarGLTFPage = () => {
   const navigate = useNavigate();
+  const location = useLocation();
   const [isGLTFLoaded, setIsGLTFLoaded] = useState(false);
   const [loadingProgress, setLoadingProgress] = useState(0);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [isDragging, setIsDragging] = useState(false);
+  const [enableSmoothCamera, setEnableSmoothCamera] = useState(true);
+  const [cameraFollowCharacter, setCameraFollowCharacter] = useState(false);
+  const [viewerMode, setViewerMode] = useState<"vrm" | "gltf">("gltf");
+  const [showAnimationModal, setShowAnimationModal] = useState(false);
+  const [isLoadingAnimation, setIsLoadingAnimation] = useState(false);
+  const [selectedAnimation, setSelectedAnimation] = useState(
+    "/models/animations/Breathing_Idle.fbx"
+  );
+  const [showAvatarModal, setShowAvatarModal] = useState(false);
+  const [isLoadingAvatar, setIsLoadingAvatar] = useState(false);
+  const [selectedAvatar, setSelectedAvatar] = useState(
+    "/models/Larasdyah_Character2.glb"
+  );
+  const [audioInputs, setAudioInputs] = useState<MediaDeviceInfo[]>([]);
+  const [selectedInputId, setSelectedInputId] = useState<string>("");
+  const [hasLoadedFromNavigation, setHasLoadedFromNavigation] = useState(false);
 
   const gltfViewerRef = useRef<GLTFViewerRef>(null);
   const fileInputRef = useRef<HTMLInputElement | null>(null);
@@ -38,6 +79,85 @@ const AvatarGLTFPage = () => {
       await processFiles(files);
       // Reset file input after successful upload
       event.target.value = "";
+    }
+  };
+
+  const handleAnimationSelect = async (animationPath: string) => {
+    try {
+      console.log("🎭 Loading animation:", animationPath);
+      setIsLoadingAnimation(true);
+      // TODO: Implement animation loading for GLTF viewer if needed
+      setSelectedAnimation(animationPath);
+      setIsLoadingAnimation(false);
+      setShowAnimationModal(false);
+      console.log("✅ Animation loaded successfully!");
+    } catch (error) {
+      console.error("❌ Failed to load animation:", error);
+      setIsLoadingAnimation(false);
+    }
+  };
+
+  const handleViewerModeChange = (mode: string) => {
+    if (mode === "vrm") {
+      navigate("/avatar-vrm");
+    } else {
+      setViewerMode("gltf");
+    }
+  };
+
+  const handleAvatarSelect = async (avatarPath: string) => {
+    try {
+      console.log("🔄 Switching to avatar:", avatarPath);
+      setIsLoadingAvatar(true);
+
+      // Convert VRM path to GLTF path
+      let gltfPath = avatarPath;
+      if (avatarPath === "/models/Larasdyah.vrm") {
+        gltfPath = "/models/Larasdyah_Character2.glb";
+      } else if (avatarPath.endsWith(".vrm")) {
+        // For other VRM models, navigate to VRM viewer
+        navigate("/avatar-vrm", { state: { loadModel: avatarPath } });
+        setShowAvatarModal(false);
+        return;
+      }
+
+      // Clear existing model first
+      if (gltfViewerRef.current) {
+        gltfViewerRef.current.clearScene();
+        setIsGLTFLoaded(false);
+      }
+
+      await new Promise((resolve) => setTimeout(resolve, 150));
+
+      setIsLoading(true);
+      setLoadingProgress(0);
+
+      // Fetch the model file
+      const response = await fetch(gltfPath);
+      const blob = await response.blob();
+      const file = new File([blob], gltfPath.split("/").pop() || "model.glb", {
+        type: "model/gltf-binary",
+      });
+
+      const fileMap = new Map<string, File>();
+      fileMap.set(file.name, file);
+
+      if (gltfViewerRef.current) {
+        await gltfViewerRef.current.loadGLTF(file, "", fileMap, (progress) => {
+          setLoadingProgress(progress);
+        });
+        setIsLoading(false);
+        setIsGLTFLoaded(true);
+        setSelectedAvatar(gltfPath);
+        setIsLoadingAvatar(false);
+        setShowAvatarModal(false);
+        console.log("✅ Avatar loaded successfully!");
+      }
+    } catch (error) {
+      console.error("❌ Failed to switch avatar:", error);
+      setIsLoading(false);
+      setIsGLTFLoaded(false);
+      setIsLoadingAvatar(false);
     }
   };
 
@@ -225,6 +345,107 @@ const AvatarGLTFPage = () => {
     };
   }, []);
 
+  // Enumerate audio devices
+  useEffect(() => {
+    if (!navigator.mediaDevices || !navigator.mediaDevices.enumerateDevices) {
+      console.warn("⚠️ MediaDevices API not available on this device");
+      return;
+    }
+
+    const enumerateDevices = async () => {
+      try {
+        const devices = await navigator.mediaDevices.enumerateDevices();
+        const audioDevices = devices.filter(
+          (device) => device.kind === "audioinput"
+        );
+        setAudioInputs(audioDevices);
+        if (audioDevices.length > 0 && !selectedInputId) {
+          setSelectedInputId(audioDevices[0].deviceId);
+        }
+      } catch (error) {
+        console.error("Error enumerating devices:", error);
+      }
+    };
+
+    enumerateDevices();
+
+    if (navigator.mediaDevices.addEventListener) {
+      navigator.mediaDevices.addEventListener("devicechange", enumerateDevices);
+    }
+
+    return () => {
+      if (navigator.mediaDevices?.removeEventListener) {
+        navigator.mediaDevices.removeEventListener(
+          "devicechange",
+          enumerateDevices
+        );
+      }
+    };
+  }, [selectedInputId]);
+
+  // Load model from navigation state (e.g., from VRM page Larasdyah button)
+  useEffect(() => {
+    const state = location.state as { loadModel?: string } | null;
+
+    // Prevent duplicate loads
+    if (state?.loadModel && gltfViewerRef.current && !hasLoadedFromNavigation) {
+      const modelPath = state.loadModel;
+
+      // Clear the navigation state IMMEDIATELY to prevent re-renders
+      navigate(location.pathname, { replace: true, state: {} });
+      setHasLoadedFromNavigation(true);
+
+      const loadModelFromPath = async () => {
+        try {
+          setIsLoading(true);
+          setLoadingProgress(0);
+
+          // Fetch the model file
+          const response = await fetch(modelPath);
+          if (!response.ok) {
+            throw new Error(`Failed to fetch model: ${response.statusText}`);
+          }
+
+          const blob = await response.blob();
+          const file = new File(
+            [blob],
+            modelPath.split("/").pop() || "model.glb",
+            {
+              type: "model/gltf-binary",
+            }
+          );
+
+          const fileMap = new Map<string, File>();
+          fileMap.set(file.name, file);
+
+          if (gltfViewerRef.current) {
+            await gltfViewerRef.current.loadGLTF(
+              file,
+              "",
+              fileMap,
+              (progress) => {
+                setLoadingProgress(progress);
+              }
+            );
+            setIsLoading(false);
+            setIsGLTFLoaded(true);
+            setSelectedAvatar(modelPath);
+            console.log("✅ GLTF model loaded from navigation state!");
+          }
+        } catch (error) {
+          console.error("❌ Failed to load GLTF from navigation state:", error);
+          setError(
+            error instanceof Error ? error.message : "Failed to load GLTF file."
+          );
+          setIsLoading(false);
+          setHasLoadedFromNavigation(false); // Reset on error
+        }
+      };
+
+      loadModelFromPath();
+    }
+  }, [location.state, navigate, hasLoadedFromNavigation]);
+
   return (
     <div
       className="flex flex-col h-screen w-full fixed inset-0 overflow-hidden lg:pl-64"
@@ -287,9 +508,86 @@ const AvatarGLTFPage = () => {
             <Menu className="h-6 w-6" />
           </Button>
           <h1 className="text-xl font-bold absolute left-1/2 -translate-x-1/2 lg:static lg:translate-x-0">
-            GLTF Viewer
+            3D Avatar Viewer
           </h1>
         </div>
+
+        {/* Desktop Settings Dropdown - Hidden on Mobile */}
+        <DropdownMenu>
+          <DropdownMenuTrigger asChild>
+            <Button
+              variant="outline"
+              size="sm"
+              className="text-base font-semibold max-md:w-10 max-md:h-10 max-md:p-0"
+            >
+              <span className="max-md:hidden">Settings</span>
+              <SettingsIcon className="md:ml-2 h-4 w-4" />
+            </Button>
+          </DropdownMenuTrigger>
+          <DropdownMenuContent align="end" className="w-56">
+            {/* Smooth Camera Toggle */}
+            <div className="flex items-center justify-between px-2 py-3 cursor-pointer hover:bg-accent rounded-sm">
+              <span className="text-sm font-medium">Smooth Camera</span>
+              <Switch
+                checked={enableSmoothCamera}
+                onCheckedChange={setEnableSmoothCamera}
+              />
+            </div>
+            {/* Camera Follow Character Toggle */}
+            <div className="flex items-center justify-between px-2 py-3 cursor-pointer hover:bg-accent rounded-sm">
+              <span className="text-sm font-medium">
+                Camera Follow Character
+              </span>
+              <Switch
+                checked={cameraFollowCharacter}
+                onCheckedChange={setCameraFollowCharacter}
+              />
+            </div>
+            {/* Separator */}
+            <Separator className="my-1" />
+            {/* Viewer Mode Tabs */}
+            <div className="px-2 py-3">
+              <p className="text-sm font-medium mb-2">Viewer Mode</p>
+              <Tabs value={viewerMode} onValueChange={handleViewerModeChange}>
+                <TabsList className="w-full">
+                  <TabsTrigger value="vrm" className="flex-1">
+                    VRM
+                  </TabsTrigger>
+                  <TabsTrigger value="gltf" className="flex-1">
+                    GLTF
+                  </TabsTrigger>
+                </TabsList>
+              </Tabs>
+            </div>
+            {/* Separator */}
+            <Separator className="my-1" />
+            {/* Reset Camera Position Button */}
+            <DropdownMenuRadioItem
+              value="reset"
+              onClick={() => {
+                // TODO: Implement reset camera for GLTF viewer
+                console.log("Reset camera position");
+              }}
+              className="flex items-center justify-center py-3 cursor-pointer hover:bg-accent"
+            >
+              <span className="text-sm font-medium">Reset Camera Position</span>
+            </DropdownMenuRadioItem>
+            {/* Upload 3D Model */}
+            <DropdownMenuRadioItem
+              value="upload"
+              onClick={(e) => {
+                e.preventDefault();
+                handleUploadModel();
+              }}
+              className="flex flex-col items-center justify-center py-6 cursor-pointer hover:bg-accent"
+            >
+              <Upload className="h-8 w-8 mb-2" />
+              <span className="text-sm font-medium">
+                Upload 3D Model (GLTF)
+              </span>
+            </DropdownMenuRadioItem>
+          </DropdownMenuContent>
+        </DropdownMenu>
       </header>
 
       <main className="flex-1 w-full overflow-hidden relative">
@@ -334,20 +632,182 @@ const AvatarGLTFPage = () => {
             </DockIcon>
           </DockItem>
 
-          {/* Upload Button */}
+          {/* Microphone Button with Selector */}
           <DockItem>
-            <DockLabel>Upload GLTF</DockLabel>
+            <DockLabel>Microphone</DockLabel>
+            <DockIcon>
+              <div className="h-full w-full flex items-center justify-center relative">
+                <button
+                  onClick={() => console.log("Microphone clicked")}
+                  className="h-full w-full flex items-center justify-center"
+                >
+                  <Mic className="h-full w-full text-foreground" />
+                </button>
+                {/* Microphone Selector Dropdown */}
+                <DropdownMenu>
+                  <DropdownMenuTrigger asChild>
+                    <button className="absolute right-0 top-1/2 -translate-y-1/2 translate-x-[calc(50%+8px)] flex items-center justify-center hover:opacity-70">
+                      <ChevronDown className="h-4 w-4 text-foreground" />
+                    </button>
+                  </DropdownMenuTrigger>
+                  <DropdownMenuContent align="start">
+                    {audioInputs.map((device) => (
+                      <DropdownMenuRadioItem
+                        key={device.deviceId}
+                        value={device.deviceId}
+                        onClick={() => setSelectedInputId(device.deviceId)}
+                      >
+                        {device.label ||
+                          `Microphone (${device.deviceId.slice(0, 5)})`}
+                      </DropdownMenuRadioItem>
+                    ))}
+                  </DropdownMenuContent>
+                </DropdownMenu>
+              </div>
+            </DockIcon>
+          </DockItem>
+
+          {/* Animation Button */}
+          <DockItem>
+            <DockLabel>Animation</DockLabel>
             <DockIcon>
               <button
-                onClick={handleUploadModel}
+                onClick={() => setShowAnimationModal(true)}
                 className="h-full w-full flex items-center justify-center"
               >
-                <Upload className="h-full w-full text-foreground" />
+                <svg
+                  viewBox="0 0 36 36"
+                  className="h-full w-full text-foreground"
+                  fill="none"
+                >
+                  <use href="/src/assets/sprite.svg#animation" />
+                </svg>
+              </button>
+            </DockIcon>
+          </DockItem>
+
+          {/* 3D Model Button */}
+          <DockItem>
+            <DockLabel>3D Avatar</DockLabel>
+            <DockIcon>
+              <button
+                onClick={() => setShowAvatarModal(true)}
+                className="h-full w-full flex items-center justify-center"
+              >
+                <svg
+                  viewBox="0 0 24 24"
+                  className="h-full w-full text-foreground"
+                  fill="none"
+                >
+                  <use href="/src/assets/sprite.svg#3D" />
+                </svg>
               </button>
             </DockIcon>
           </DockItem>
         </Dock>
       </footer>
+
+      {/* 3D Avatar Selection Modal */}
+      <Dialog open={showAvatarModal} onOpenChange={setShowAvatarModal}>
+        <DialogContent
+          className="sm:max-w-[600px]"
+          aria-describedby="avatar-dialog-description"
+        >
+          <DialogHeader>
+            <DialogTitle>Select 3D Avatar</DialogTitle>
+            <DialogDescription id="avatar-dialog-description">
+              Choose from the available 3D avatars below
+            </DialogDescription>
+          </DialogHeader>
+          {isLoadingAvatar && (
+            <div className="absolute inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-center justify-center rounded-lg">
+              <div className="text-center space-y-4">
+                <div className="text-2xl font-bold text-white">Loading...</div>
+              </div>
+            </div>
+          )}
+          <div className="max-h-[60vh] overflow-y-auto">
+            <div className="grid grid-cols-3 gap-4 p-4">
+              {predefinedAvatars.map((avatar) => (
+                <button
+                  key={avatar.path}
+                  onClick={() => handleAvatarSelect(avatar.path)}
+                  className="group relative flex flex-col items-center gap-2 transition-transform hover:-translate-y-2"
+                >
+                  <div
+                    className={`w-full aspect-square rounded-2xl overflow-hidden border-2 transition-colors ${
+                      selectedAvatar === avatar.path ||
+                      (avatar.path === "/models/Larasdyah.vrm" &&
+                        selectedAvatar === "/models/Larasdyah_Character2.glb")
+                        ? "border-primary"
+                        : "border-transparent group-hover:border-primary/50"
+                    }`}
+                  >
+                    <img
+                      src={avatar.thumbnail}
+                      alt={avatar.name}
+                      className="w-full h-full object-cover"
+                    />
+                  </div>
+                  <span className="text-sm font-medium text-center">
+                    {avatar.name}
+                  </span>
+                </button>
+              ))}
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      {/* Animation Selection Modal */}
+      <Dialog open={showAnimationModal} onOpenChange={setShowAnimationModal}>
+        <DialogContent
+          className="sm:max-w-[600px]"
+          aria-describedby="animation-dialog-description"
+        >
+          <DialogHeader>
+            <DialogTitle>Select Animation</DialogTitle>
+            <DialogDescription id="animation-dialog-description">
+              Choose from the available animations below
+            </DialogDescription>
+          </DialogHeader>
+          {isLoadingAnimation && (
+            <div className="absolute inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-center justify-center rounded-lg">
+              <div className="text-center space-y-4">
+                <div className="text-2xl font-bold text-white">Loading...</div>
+              </div>
+            </div>
+          )}
+          <div className="max-h-[60vh] overflow-y-auto">
+            <div className="grid grid-cols-3 gap-4 p-4">
+              {predefinedAnimations.map((animation) => (
+                <button
+                  key={animation.path}
+                  onClick={() => handleAnimationSelect(animation.path)}
+                  className="group relative flex flex-col items-center gap-2 transition-transform hover:-translate-y-2"
+                >
+                  <div
+                    className={`w-full aspect-square rounded-2xl overflow-hidden border-2 transition-colors ${
+                      selectedAnimation === animation.path
+                        ? "border-primary"
+                        : "border-transparent group-hover:border-primary/50"
+                    }`}
+                  >
+                    <img
+                      src={animation.thumbnail}
+                      alt={animation.name}
+                      className="w-full h-full object-cover"
+                    />
+                  </div>
+                  <span className="text-sm font-medium text-center">
+                    {animation.name}
+                  </span>
+                </button>
+              ))}
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
 
       <input
         ref={fileInputRef}

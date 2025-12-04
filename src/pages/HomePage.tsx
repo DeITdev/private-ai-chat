@@ -41,7 +41,7 @@ const HomePage = () => {
   };
 
   const handleGoToAvatar = () => {
-    navigate("/avatar");
+    navigate("/avatar-vrm");
   };
 
   return (

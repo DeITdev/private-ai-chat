@@ -18,6 +18,7 @@ import { predefinedAvatars, predefinedAnimations } from "~/constants";
 import { Button } from "~/components/ui/button";
 import { Switch } from "~/components/ui/switch";
 import { Separator } from "~/components/ui/separator";
+import { Tabs, TabsList, TabsTrigger } from "~/components/ui/tabs";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -59,6 +60,7 @@ const AvatarPage = () => {
   const [enableSmoothCamera, setEnableSmoothCamera] = useState(true);
   const [cameraFollowCharacter, setCameraFollowCharacter] = useState(false);
   const [hideGridAxes, setHideGridAxes] = useState(false);
+  const [viewerMode, setViewerMode] = useState<"vrm" | "gltf">("vrm");
 
   const mediaRecorderRef = useRef<MediaRecorder | null>(null);
   const audioChunksRef = useRef<Blob[]>([]);
@@ -325,6 +327,16 @@ const AvatarPage = () => {
     try {
       console.log("🔄 Switching to avatar:", avatarPath);
 
+      // Special handling for Larasdyah - navigate to GLTF viewer
+      if (avatarPath === "/models/Larasdyah.vrm") {
+        console.log("🔄 Navigating to GLTF viewer for Larasdyah model");
+        navigate("/avatar-gltf", {
+          state: { loadModel: "/models/Larasdyah_Character2.glb" },
+        });
+        setShowAvatarModal(false);
+        return;
+      }
+
       // Show loading state in modal
       setIsLoadingAvatar(true);
 
@@ -377,6 +389,14 @@ const AvatarPage = () => {
     } catch (error) {
       console.error("❌ Failed to load animation:", error);
       setIsLoadingAnimation(false);
+    }
+  };
+
+  const handleViewerModeChange = (mode: string) => {
+    if (mode === "gltf") {
+      navigate("/avatar-gltf");
+    } else {
+      setViewerMode("vrm");
     }
   };
 
@@ -731,6 +751,22 @@ const AvatarPage = () => {
                 checked={hideGridAxes}
                 onCheckedChange={setHideGridAxes}
               />
+            </div>
+            {/* Separator */}
+            <Separator className="my-1" />
+            {/* Viewer Mode Tabs */}
+            <div className="px-2 py-3">
+              <p className="text-sm font-medium mb-2">Viewer Mode</p>
+              <Tabs value={viewerMode} onValueChange={handleViewerModeChange}>
+                <TabsList className="w-full">
+                  <TabsTrigger value="vrm" className="flex-1">
+                    VRM
+                  </TabsTrigger>
+                  <TabsTrigger value="gltf" className="flex-1">
+                    GLTF
+                  </TabsTrigger>
+                </TabsList>
+              </Tabs>
             </div>
             {/* Separator */}
             <Separator className="my-1" />
