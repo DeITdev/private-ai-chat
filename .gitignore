@@ -14,6 +14,7 @@ dist-ssr
 venv
 .venv
 r3f-vrm-final
+three-gltf-viewer
 .env
 .env.local
 .env.production
@@ -29,8 +30,12 @@ r3f-vrm-final
 *.sln
 *.sw?
 
+# 3D Models
 Larasdyah.vrm
 Evernight.vrm
+*.glb
+
+example
 
 # RAG / Vector Store
 /backend/data/vector_store/

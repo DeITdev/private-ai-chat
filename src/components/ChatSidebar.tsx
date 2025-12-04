@@ -51,12 +51,13 @@ export const ChatSidebar = () => {
   };
 
   const handleToggleViewMode = () => {
+    // Toggle between chat and avatar (VRM by default)
     const newMode = viewMode === "chat" ? "avatar" : "chat";
     setViewMode(newMode);
 
-    // Navigate to avatar route or back to thread
+    // Navigate to appropriate route
     if (newMode === "avatar") {
-      navigate("/avatar");
+      navigate("/avatar-vrm");
     } else {
       // Navigate back to the active thread or first thread
       if (activeThread) {
@@ -84,7 +85,10 @@ export const ChatSidebar = () => {
     setActiveThread(activeThreadId);
 
     // Update view mode based on current route
-    if (location.pathname === "/avatar") {
+    if (
+      location.pathname === "/avatar-vrm" ||
+      location.pathname === "/avatar-gltf"
+    ) {
       setViewMode("avatar");
     } else {
       setViewMode("chat");
