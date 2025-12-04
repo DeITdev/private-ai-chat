@@ -312,9 +312,9 @@ const AvatarGLTFPage = () => {
             </div>
           </div>
         )}
-        <GLTFViewer 
-          ref={gltfViewerRef} 
-          theme={theme === 'system' ? 'dark' : theme} 
+        <GLTFViewer
+          ref={gltfViewerRef}
+          theme={theme === "system" ? "dark" : theme}
         />
       </main>
 

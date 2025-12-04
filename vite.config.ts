@@ -10,6 +10,6 @@ export default defineConfig({
     },
   },
   optimizeDeps: {
-    exclude: ['example', 'three-gltf-viewer'],
+    exclude: ["example", "three-gltf-viewer"],
   },
 });
