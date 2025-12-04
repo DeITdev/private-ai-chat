@@ -24,6 +24,10 @@ export interface GLTFViewerRef {
   playAnimation: (index: number) => void;
 }
 
+interface GLTFViewerProps {
+  theme?: 'light' | 'dark';
+}
+
 // Basic neutral environment using RoomEnvironment-like setup
 const createNeutralEnvironment = (
   renderer: THREE.WebGLRenderer
@@ -65,7 +69,7 @@ const traverseMaterials = (
   });
 };
 
-export const GLTFViewer = forwardRef<GLTFViewerRef>((_, ref) => {
+export const GLTFViewer = forwardRef<GLTFViewerRef, GLTFViewerProps>(({ theme = 'dark' }, ref) => {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const sceneRef = useRef<THREE.Scene | null>(null);
   const contentRef = useRef<THREE.Object3D | null>(null);
@@ -98,7 +102,7 @@ export const GLTFViewer = forwardRef<GLTFViewerRef>((_, ref) => {
     ambientColor: "#FFFFFF",
     directIntensity: 0.8 * Math.PI,
     directColor: "#FFFFFF",
-    bgColor: "#191919",
+    bgColor: theme === 'light' ? "#f2f2f2" : "#191919",
     pointSize: 1.0,
     screenSpacePanning: true,
   });
@@ -712,6 +716,16 @@ export const GLTFViewer = forwardRef<GLTFViewerRef>((_, ref) => {
       }
     };
   }, [addGUI]);
+
+  // Update background color when theme changes
+  useEffect(() => {
+    const newBgColor = theme === 'light' ? '#f2f2f2' : '#191919';
+    stateRef.current.bgColor = newBgColor;
+    
+    if (sceneRef.current) {
+      sceneRef.current.background = new THREE.Color(newBgColor);
+    }
+  }, [theme]);
 
   return (
     <canvas

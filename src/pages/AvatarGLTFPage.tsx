@@ -10,6 +10,7 @@ import { Home, Upload, Menu } from "lucide-react";
 import { Button } from "~/components/ui/button";
 import { useNavigate } from "react-router-dom";
 import { useSidebar } from "~/components/ui/sidebar";
+import { useTheme } from "~/components/ThemeProvider";
 
 const AvatarGLTFPage = () => {
   const navigate = useNavigate();
@@ -23,6 +24,7 @@ const AvatarGLTFPage = () => {
   const fileInputRef = useRef<HTMLInputElement | null>(null);
   const dragCounterRef = useRef(0);
   const { toggleSidebar } = useSidebar();
+  const { theme } = useTheme();
 
   const handleUploadModel = () => {
     fileInputRef.current?.click();
@@ -310,7 +312,10 @@ const AvatarGLTFPage = () => {
             </div>
           </div>
         )}
-        <GLTFViewer ref={gltfViewerRef} />
+        <GLTFViewer 
+          ref={gltfViewerRef} 
+          theme={theme === 'system' ? 'dark' : theme} 
+        />
       </main>
 
       <footer className="absolute bottom-0 left-0 right-0 z-10 flex justify-center items-end pb-4 lg:left-64">
