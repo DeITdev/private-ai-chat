@@ -25,13 +25,7 @@ import {
 } from "~/components/ui/dropdown-menu";
 import { Tabs, TabsList, TabsTrigger } from "~/components/ui/tabs";
 import { predefinedAvatars, predefinedAnimations } from "~/constants";
-import {
-  Dialog,
-  DialogContent,
-  DialogHeader,
-  DialogTitle,
-  DialogDescription,
-} from "~/components/ui/dialog";
+import { SelectionModal } from "~/components/SelectionModal";
 import { useNavigate, useLocation } from "react-router-dom";
 import { useSidebar } from "~/components/ui/sidebar";
 import { useTheme } from "~/components/ThemeProvider";
@@ -435,7 +429,7 @@ const AvatarGLTFPage = () => {
 
       loadModelFromPath();
     }
-  }, [location.state, navigate, hasLoadedFromNavigation]);
+  }, [location.state, location.pathname, navigate, hasLoadedFromNavigation]);
 
   return (
     <div
@@ -699,92 +693,28 @@ const AvatarGLTFPage = () => {
       </footer>
 
       {/* 3D Avatar Selection Modal */}
-      <Dialog open={showAvatarModal} onOpenChange={setShowAvatarModal}>
-        <DialogContent
-          className="sm:max-w-[600px]"
-          aria-describedby="avatar-dialog-description"
-        >
-          <DialogHeader>
-            <DialogTitle>Select 3D Avatar</DialogTitle>
-            <DialogDescription id="avatar-dialog-description">
-              Choose from the available 3D avatars below
-            </DialogDescription>
-          </DialogHeader>
-          <div className="max-h-[60vh] overflow-y-auto">
-            <div className="grid grid-cols-3 gap-4 p-4">
-              {predefinedAvatars.map((avatar) => (
-                <button
-                  key={avatar.path}
-                  onClick={() => handleAvatarSelect(avatar.path)}
-                  className="group relative flex flex-col items-center gap-2 transition-transform hover:-translate-y-2"
-                >
-                  <div
-                    className={`w-full aspect-square rounded-2xl overflow-hidden border-2 transition-colors ${
-                      selectedAvatar === avatar.path ||
-                      (avatar.path === "/models/Larasdyah.vrm" &&
-                        selectedAvatar === "/models/Larasdyah_Character2.glb")
-                        ? "border-primary"
-                        : "border-transparent group-hover:border-primary/50"
-                    }`}
-                  >
-                    <img
-                      src={avatar.thumbnail}
-                      alt={avatar.name}
-                      className="w-full h-full object-cover"
-                    />
-                  </div>
-                  <span className="text-sm font-medium text-center">
-                    {avatar.name}
-                  </span>
-                </button>
-              ))}
-            </div>
-          </div>
-        </DialogContent>
-      </Dialog>
+      <SelectionModal
+        open={showAvatarModal}
+        onOpenChange={setShowAvatarModal}
+        title="Select 3D Avatar"
+        description="Choose from the available 3D avatars below"
+        items={predefinedAvatars}
+        selectedItem={selectedAvatar}
+        onSelectItem={handleAvatarSelect}
+        descriptionId="avatar-dialog-description"
+      />
 
       {/* Animation Selection Modal */}
-      <Dialog open={showAnimationModal} onOpenChange={setShowAnimationModal}>
-        <DialogContent
-          className="sm:max-w-[600px]"
-          aria-describedby="animation-dialog-description"
-        >
-          <DialogHeader>
-            <DialogTitle>Select Animation</DialogTitle>
-            <DialogDescription id="animation-dialog-description">
-              Choose from the available animations below
-            </DialogDescription>
-          </DialogHeader>
-          <div className="max-h-[60vh] overflow-y-auto">
-            <div className="grid grid-cols-3 gap-4 p-4">
-              {predefinedAnimations.map((animation) => (
-                <button
-                  key={animation.path}
-                  onClick={() => handleAnimationSelect(animation.path)}
-                  className="group relative flex flex-col items-center gap-2 transition-transform hover:-translate-y-2"
-                >
-                  <div
-                    className={`w-full aspect-square rounded-2xl overflow-hidden border-2 transition-colors ${
-                      selectedAnimation === animation.path
-                        ? "border-primary"
-                        : "border-transparent group-hover:border-primary/50"
-                    }`}
-                  >
-                    <img
-                      src={animation.thumbnail}
-                      alt={animation.name}
-                      className="w-full h-full object-cover"
-                    />
-                  </div>
-                  <span className="text-sm font-medium text-center">
-                    {animation.name}
-                  </span>
-                </button>
-              ))}
-            </div>
-          </div>
-        </DialogContent>
-      </Dialog>
+      <SelectionModal
+        open={showAnimationModal}
+        onOpenChange={setShowAnimationModal}
+        title="Select Animation"
+        description="Choose from the available animations below"
+        items={predefinedAnimations}
+        selectedItem={selectedAnimation}
+        onSelectItem={handleAnimationSelect}
+        descriptionId="animation-dialog-description"
+      />
 
       <input
         ref={fileInputRef}

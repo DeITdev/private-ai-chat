@@ -25,13 +25,7 @@ import {
   DropdownMenuTrigger,
   DropdownMenuRadioItem,
 } from "~/components/ui/dropdown-menu";
-import {
-  Dialog,
-  DialogContent,
-  DialogHeader,
-  DialogTitle,
-  DialogDescription,
-} from "~/components/ui/dialog";
+import { SelectionModal } from "~/components/SelectionModal";
 import { useNavigate } from "react-router-dom";
 import { useSidebar } from "~/components/ui/sidebar";
 import ollama from "ollama";
@@ -47,13 +41,11 @@ const AvatarPage = () => {
   const [showSkipButton, setShowSkipButton] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [showAvatarModal, setShowAvatarModal] = useState(false);
-  const [isLoadingAvatar, setIsLoadingAvatar] = useState(false);
   const [selectedAvatar, setSelectedAvatar] = useState(
     "/models/HatsuneMikuNT.vrm"
   );
   const [hasLoadedInitially, setHasLoadedInitially] = useState(false);
   const [showAnimationModal, setShowAnimationModal] = useState(false);
-  const [isLoadingAnimation, setIsLoadingAnimation] = useState(false);
   const [selectedAnimation, setSelectedAnimation] = useState(
     "/models/animations/Breathing_Idle.fbx"
   );
@@ -337,8 +329,7 @@ const AvatarPage = () => {
         return;
       }
 
-      // Show loading state in modal
-      setIsLoadingAvatar(true);
+      setShowAvatarModal(false);
 
       // Clear existing model first
       if (vrmViewerRef.current) {
@@ -359,36 +350,28 @@ const AvatarPage = () => {
         setIsVRMLoaded(true);
         setSelectedAvatar(avatarPath);
         setHasLoadedInitially(true); // Mark as loaded to prevent useEffect from re-running
-        setIsLoadingAvatar(false);
-        setShowAvatarModal(false);
         console.log("✅ Avatar switched successfully!");
       }
     } catch (error) {
       console.error("❌ Failed to switch avatar:", error);
       setIsLoading(false);
       setIsVRMLoaded(false);
-      setIsLoadingAvatar(false);
     }
   };
 
   const handleAnimationSelect = async (animationPath: string) => {
     try {
       console.log("🎭 Loading animation:", animationPath);
-
-      // Show loading state in modal
-      setIsLoadingAnimation(true);
+      setShowAnimationModal(false);
 
       if (vrmViewerRef.current) {
         await vrmViewerRef.current.loadAnimation(animationPath);
       }
 
       setSelectedAnimation(animationPath);
-      setIsLoadingAnimation(false);
-      setShowAnimationModal(false);
       console.log("✅ Animation loaded successfully!");
     } catch (error) {
       console.error("❌ Failed to load animation:", error);
-      setIsLoadingAnimation(false);
     }
   };
 
@@ -896,104 +879,28 @@ const AvatarPage = () => {
       </footer>
 
       {/* 3D Avatar Selection Modal */}
-      <Dialog open={showAvatarModal} onOpenChange={setShowAvatarModal}>
-        <DialogContent
-          className="sm:max-w-[600px]"
-          aria-describedby="avatar-dialog-description"
-        >
-          <DialogHeader>
-            <DialogTitle>Select 3D Avatar</DialogTitle>
-            <DialogDescription id="avatar-dialog-description">
-              Choose from the available 3D avatars below
-            </DialogDescription>
-          </DialogHeader>
-          {isLoadingAvatar && (
-            <div className="absolute inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-center justify-center rounded-lg">
-              <div className="text-center space-y-4">
-                <div className="text-2xl font-bold text-white">Loading...</div>
-              </div>
-            </div>
-          )}
-          <div className="max-h-[60vh] overflow-y-auto">
-            <div className="grid grid-cols-3 gap-4 p-4">
-              {predefinedAvatars.map((avatar) => (
-                <button
-                  key={avatar.path}
-                  onClick={() => handleAvatarSelect(avatar.path)}
-                  className="group relative flex flex-col items-center gap-2 transition-transform hover:-translate-y-2"
-                >
-                  <div
-                    className={`w-full aspect-square rounded-2xl overflow-hidden border-2 transition-colors ${
-                      selectedAvatar === avatar.path
-                        ? "border-primary"
-                        : "border-transparent group-hover:border-primary/50"
-                    }`}
-                  >
-                    <img
-                      src={avatar.thumbnail}
-                      alt={avatar.name}
-                      className="w-full h-full object-cover"
-                    />
-                  </div>
-                  <span className="text-sm font-medium text-center">
-                    {avatar.name}
-                  </span>
-                </button>
-              ))}
-            </div>
-          </div>
-        </DialogContent>
-      </Dialog>
+      <SelectionModal
+        open={showAvatarModal}
+        onOpenChange={setShowAvatarModal}
+        title="Select 3D Avatar"
+        description="Choose from the available 3D avatars below"
+        items={predefinedAvatars}
+        selectedItem={selectedAvatar}
+        onSelectItem={handleAvatarSelect}
+        descriptionId="avatar-dialog-description"
+      />
 
       {/* Animation Selection Modal */}
-      <Dialog open={showAnimationModal} onOpenChange={setShowAnimationModal}>
-        <DialogContent
-          className="sm:max-w-[600px]"
-          aria-describedby="animation-dialog-description"
-        >
-          <DialogHeader>
-            <DialogTitle>Select Animation</DialogTitle>
-            <DialogDescription id="animation-dialog-description">
-              Choose from the available animations below
-            </DialogDescription>
-          </DialogHeader>
-          {isLoadingAnimation && (
-            <div className="absolute inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-center justify-center rounded-lg">
-              <div className="text-center space-y-4">
-                <div className="text-2xl font-bold text-white">Loading...</div>
-              </div>
-            </div>
-          )}
-          <div className="max-h-[60vh] overflow-y-auto">
-            <div className="grid grid-cols-3 gap-4 p-4">
-              {predefinedAnimations.map((animation) => (
-                <button
-                  key={animation.path}
-                  onClick={() => handleAnimationSelect(animation.path)}
-                  className="group relative flex flex-col items-center gap-2 transition-transform hover:-translate-y-2"
-                >
-                  <div
-                    className={`w-full aspect-square rounded-2xl overflow-hidden border-2 transition-colors ${
-                      selectedAnimation === animation.path
-                        ? "border-primary"
-                        : "border-transparent group-hover:border-primary/50"
-                    }`}
-                  >
-                    <img
-                      src={animation.thumbnail}
-                      alt={animation.name}
-                      className="w-full h-full object-cover"
-                    />
-                  </div>
-                  <span className="text-sm font-medium text-center">
-                    {animation.name}
-                  </span>
-                </button>
-              ))}
-            </div>
-          </div>
-        </DialogContent>
-      </Dialog>
+      <SelectionModal
+        open={showAnimationModal}
+        onOpenChange={setShowAnimationModal}
+        title="Select Animation"
+        description="Choose from the available animations below"
+        items={predefinedAnimations}
+        selectedItem={selectedAnimation}
+        onSelectItem={handleAnimationSelect}
+        descriptionId="animation-dialog-description"
+      />
 
       <audio ref={audioRef} className="hidden" />
       <input

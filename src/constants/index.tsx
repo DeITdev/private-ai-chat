@@ -23,6 +23,11 @@ export const predefinedAnimations = [
     thumbnail: "/default-thumbnail-3davatar.png",
   },
   {
+    name: "Standing Idle",
+    path: "/models/animations/Standing_Idle.fbx",
+    thumbnail: "/default-thumbnail-3davatar.png",
+  },
+  {
     name: "Swing Dancing",
     path: "/models/animations/Swing_Dancing.fbx",
     thumbnail: "/default-thumbnail-3davatar.png",
@@ -30,6 +35,16 @@ export const predefinedAnimations = [
   {
     name: "Thriller Part 2",
     path: "/models/animations/Thriller_Part_2.fbx",
+    thumbnail: "/default-thumbnail-3davatar.png",
+  },
+  {
+    name: "Talking",
+    path: "/models/animations/Talking.fbx",
+    thumbnail: "/default-thumbnail-3davatar.png",
+  },
+  {
+    name: "Walking",
+    path: "/models/animations/Walking.fbx",
     thumbnail: "/default-thumbnail-3davatar.png",
   },
 ];
