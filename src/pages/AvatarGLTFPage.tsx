@@ -47,7 +47,7 @@ const AvatarGLTFPage = () => {
   );
   const [showAvatarModal, setShowAvatarModal] = useState(false);
   const [selectedAvatar, setSelectedAvatar] = useState(
-    "/models/Larasdyah_Character2.glb"
+    "/models/glb/Larasdyah_Character2.glb"
   );
   const [audioInputs, setAudioInputs] = useState<MediaDeviceInfo[]>([]);
   const [selectedInputId, setSelectedInputId] = useState<string>("");
@@ -101,8 +101,8 @@ const AvatarGLTFPage = () => {
 
       // Convert VRM path to GLTF path
       let gltfPath = avatarPath;
-      if (avatarPath === "/models/Larasdyah.vrm") {
-        gltfPath = "/models/Larasdyah_Character2.glb";
+      if (avatarPath === "/models/glb/Larasdyah_Character2.glb") {
+        gltfPath = "/models/glb/Larasdyah_Character2.glb";
       } else if (avatarPath.endsWith(".vrm")) {
         // For other VRM models, navigate to VRM viewer
         navigate("/avatar-vrm", { state: { loadModel: avatarPath } });

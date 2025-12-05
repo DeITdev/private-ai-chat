@@ -42,7 +42,7 @@ const AvatarPage = () => {
   const [error, setError] = useState<string | null>(null);
   const [showAvatarModal, setShowAvatarModal] = useState(false);
   const [selectedAvatar, setSelectedAvatar] = useState(
-    "/models/HatsuneMikuNT.vrm"
+    "/models/vrm/HatsuneMikuNT.vrm"
   );
   const [hasLoadedInitially, setHasLoadedInitially] = useState(false);
   const [showAnimationModal, setShowAnimationModal] = useState(false);
@@ -320,10 +320,10 @@ const AvatarPage = () => {
       console.log("🔄 Switching to avatar:", avatarPath);
 
       // Special handling for Larasdyah - navigate to GLTF viewer
-      if (avatarPath === "/models/Larasdyah.vrm") {
+      if (avatarPath === "/models/glb/Larasdyah_Character2.glb") {
         console.log("🔄 Navigating to GLTF viewer for Larasdyah model");
         navigate("/avatar-gltf", {
-          state: { loadModel: "/models/Larasdyah_Character2.glb" },
+          state: { loadModel: "/models/glb/Larasdyah_Character2.glb" },
         });
         setShowAvatarModal(false);
         return;
