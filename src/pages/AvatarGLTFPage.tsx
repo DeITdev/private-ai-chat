@@ -48,12 +48,10 @@ const AvatarGLTFPage = () => {
   const [cameraFollowCharacter, setCameraFollowCharacter] = useState(false);
   const [viewerMode, setViewerMode] = useState<"vrm" | "gltf">("gltf");
   const [showAnimationModal, setShowAnimationModal] = useState(false);
-  const [isLoadingAnimation, setIsLoadingAnimation] = useState(false);
   const [selectedAnimation, setSelectedAnimation] = useState(
     "/models/animations/Breathing_Idle.fbx"
   );
   const [showAvatarModal, setShowAvatarModal] = useState(false);
-  const [isLoadingAvatar, setIsLoadingAvatar] = useState(false);
   const [selectedAvatar, setSelectedAvatar] = useState(
     "/models/Larasdyah_Character2.glb"
   );
@@ -85,15 +83,12 @@ const AvatarGLTFPage = () => {
   const handleAnimationSelect = async (animationPath: string) => {
     try {
       console.log("🎭 Loading animation:", animationPath);
-      setIsLoadingAnimation(true);
+      setShowAnimationModal(false);
       // TODO: Implement animation loading for GLTF viewer if needed
       setSelectedAnimation(animationPath);
-      setIsLoadingAnimation(false);
-      setShowAnimationModal(false);
       console.log("✅ Animation loaded successfully!");
     } catch (error) {
       console.error("❌ Failed to load animation:", error);
-      setIsLoadingAnimation(false);
     }
   };
 
@@ -108,7 +103,7 @@ const AvatarGLTFPage = () => {
   const handleAvatarSelect = async (avatarPath: string) => {
     try {
       console.log("🔄 Switching to avatar:", avatarPath);
-      setIsLoadingAvatar(true);
+      setShowAvatarModal(false);
 
       // Convert VRM path to GLTF path
       let gltfPath = avatarPath;
@@ -117,7 +112,6 @@ const AvatarGLTFPage = () => {
       } else if (avatarPath.endsWith(".vrm")) {
         // For other VRM models, navigate to VRM viewer
         navigate("/avatar-vrm", { state: { loadModel: avatarPath } });
-        setShowAvatarModal(false);
         return;
       }
 
@@ -149,15 +143,12 @@ const AvatarGLTFPage = () => {
         setIsLoading(false);
         setIsGLTFLoaded(true);
         setSelectedAvatar(gltfPath);
-        setIsLoadingAvatar(false);
-        setShowAvatarModal(false);
         console.log("✅ Avatar loaded successfully!");
       }
     } catch (error) {
       console.error("❌ Failed to switch avatar:", error);
       setIsLoading(false);
       setIsGLTFLoaded(false);
-      setIsLoadingAvatar(false);
     }
   };
 
@@ -719,13 +710,6 @@ const AvatarGLTFPage = () => {
               Choose from the available 3D avatars below
             </DialogDescription>
           </DialogHeader>
-          {isLoadingAvatar && (
-            <div className="absolute inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-center justify-center rounded-lg">
-              <div className="text-center space-y-4">
-                <div className="text-2xl font-bold text-white">Loading...</div>
-              </div>
-            </div>
-          )}
           <div className="max-h-[60vh] overflow-y-auto">
             <div className="grid grid-cols-3 gap-4 p-4">
               {predefinedAvatars.map((avatar) => (
@@ -771,13 +755,6 @@ const AvatarGLTFPage = () => {
               Choose from the available animations below
             </DialogDescription>
           </DialogHeader>
-          {isLoadingAnimation && (
-            <div className="absolute inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-center justify-center rounded-lg">
-              <div className="text-center space-y-4">
-                <div className="text-2xl font-bold text-white">Loading...</div>
-              </div>
-            </div>
-          )}
           <div className="max-h-[60vh] overflow-y-auto">
             <div className="grid grid-cols-3 gap-4 p-4">
               {predefinedAnimations.map((animation) => (
