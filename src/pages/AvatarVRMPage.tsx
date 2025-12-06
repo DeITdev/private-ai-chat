@@ -1,6 +1,13 @@
 import { useState, useRef, useEffect } from "react";
 import { VRMViewer, VRMViewerRef } from "~/components/VRMViewer";
 import { VRMDatGUIControl } from "~/components/VRMDatGUIControl";
+
+interface PoseData {
+  name?: string;
+  code?: string;
+  vrmVersion?: string;
+  data?: Record<string, unknown>;
+}
 import {
   Dock,
   DockIcon,
@@ -428,9 +435,16 @@ const AvatarPage = () => {
   };
 
   // VRM Control Handlers
-  const handlePoseLoad = (poseData: any) => {
+  const handlePoseLoad = (poseData: PoseData) => {
     if (vrmViewerRef.current) {
-      vrmViewerRef.current.loadPose(poseData);
+      vrmViewerRef.current.loadPose(
+        poseData as {
+          name?: string;
+          code?: string;
+          vrmVersion?: string;
+          data?: Record<string, { rotation: [number, number, number, number] }>;
+        }
+      );
     }
   };
 

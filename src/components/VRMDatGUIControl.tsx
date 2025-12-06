@@ -383,214 +383,38 @@ export const VRMDatGUIControl = ({
                 Spring bones
               </AccordionTrigger>
               <AccordionContent className="px-4 pb-4">
-                <Accordion type="single" collapsible className="w-full">
-                  {springBones.length === 0 ? (
-                    <p className="text-sm text-muted-foreground">
-                      No spring bones available
-                    </p>
-                  ) : (
-                    springBones.map((bone) => (
-                      <AccordionItem key={bone.name} value={bone.name}>
-                        <AccordionTrigger className="text-sm py-2">
-                          {bone.name}
-                        </AccordionTrigger>
-                        <AccordionContent className="space-y-3 pb-2">
-                          {/* Drag Force */}
-                          <div className="space-y-1">
-                            <div className="flex items-center justify-between">
-                              <Label className="text-xs">DragForce</Label>
-                              <Input
-                                type="text"
-                                inputMode="decimal"
-                                value={
-                                  springBoneInputs[bone.name]?.dragForce || "0"
-                                }
-                                onChange={(e) => {
-                                  const newInputs = { ...springBoneInputs };
-                                  if (!newInputs[bone.name])
-                                    newInputs[bone.name] = {
-                                      dragForce: "",
-                                      gravityPower: "",
-                                      hitRadius: "",
-                                      stiffness: "",
-                                      gravityDirX: "",
-                                      gravityDirY: "",
-                                      gravityDirZ: "",
-                                    };
-                                  newInputs[bone.name].dragForce =
-                                    e.target.value;
-                                  setSpringBoneInputs(newInputs);
-                                }}
-                                onBlur={() => {
-                                  const value = parseFloat(
-                                    springBoneInputs[
-                                      bone.name
-                                    ]?.dragForce?.replace(",", ".") || "0"
-                                  );
-                                  if (!isNaN(value)) {
-                                    onSpringBoneSettingChange?.(
-                                      bone.name,
-                                      "dragForce",
-                                      value
-                                    );
-                                  }
-                                }}
-                                className="w-16 h-7 text-xs"
-                              />
-                            </div>
-                          </div>
-
-                          {/* Gravity Power */}
-                          <div className="space-y-1">
-                            <div className="flex items-center justify-between">
-                              <Label className="text-xs">GravityPower</Label>
-                              <Input
-                                type="text"
-                                inputMode="decimal"
-                                value={
-                                  springBoneInputs[bone.name]?.gravityPower ||
-                                  "0"
-                                }
-                                onChange={(e) => {
-                                  const newInputs = { ...springBoneInputs };
-                                  if (!newInputs[bone.name])
-                                    newInputs[bone.name] = {
-                                      dragForce: "",
-                                      gravityPower: "",
-                                      hitRadius: "",
-                                      stiffness: "",
-                                      gravityDirX: "",
-                                      gravityDirY: "",
-                                      gravityDirZ: "",
-                                    };
-                                  newInputs[bone.name].gravityPower =
-                                    e.target.value;
-                                  setSpringBoneInputs(newInputs);
-                                }}
-                                onBlur={() => {
-                                  const value = parseFloat(
-                                    springBoneInputs[
-                                      bone.name
-                                    ]?.gravityPower?.replace(",", ".") || "0"
-                                  );
-                                  if (!isNaN(value)) {
-                                    onSpringBoneSettingChange?.(
-                                      bone.name,
-                                      "gravityPower",
-                                      value
-                                    );
-                                  }
-                                }}
-                                className="w-16 h-7 text-xs"
-                              />
-                            </div>
-                          </div>
-
-                          {/* Hit Radius */}
-                          <div className="space-y-1">
-                            <div className="flex items-center justify-between">
-                              <Label className="text-xs">Hit Radius</Label>
-                              <Input
-                                type="text"
-                                inputMode="decimal"
-                                value={
-                                  springBoneInputs[bone.name]?.hitRadius || "0"
-                                }
-                                onChange={(e) => {
-                                  const newInputs = { ...springBoneInputs };
-                                  if (!newInputs[bone.name])
-                                    newInputs[bone.name] = {
-                                      dragForce: "",
-                                      gravityPower: "",
-                                      hitRadius: "",
-                                      stiffness: "",
-                                      gravityDirX: "",
-                                      gravityDirY: "",
-                                      gravityDirZ: "",
-                                    };
-                                  newInputs[bone.name].hitRadius =
-                                    e.target.value;
-                                  setSpringBoneInputs(newInputs);
-                                }}
-                                onBlur={() => {
-                                  const value = parseFloat(
-                                    springBoneInputs[
-                                      bone.name
-                                    ]?.hitRadius?.replace(",", ".") || "0"
-                                  );
-                                  if (!isNaN(value)) {
-                                    onSpringBoneSettingChange?.(
-                                      bone.name,
-                                      "hitRadius",
-                                      value
-                                    );
-                                  }
-                                }}
-                                className="w-16 h-7 text-xs"
-                              />
-                            </div>
-                          </div>
-
-                          {/* Stiffness */}
-                          <div className="space-y-1">
-                            <div className="flex items-center justify-between">
-                              <Label className="text-xs">Stiffness</Label>
-                              <Input
-                                type="text"
-                                inputMode="decimal"
-                                value={
-                                  springBoneInputs[bone.name]?.stiffness || "0"
-                                }
-                                onChange={(e) => {
-                                  const newInputs = { ...springBoneInputs };
-                                  if (!newInputs[bone.name])
-                                    newInputs[bone.name] = {
-                                      dragForce: "",
-                                      gravityPower: "",
-                                      hitRadius: "",
-                                      stiffness: "",
-                                      gravityDirX: "",
-                                      gravityDirY: "",
-                                      gravityDirZ: "",
-                                    };
-                                  newInputs[bone.name].stiffness =
-                                    e.target.value;
-                                  setSpringBoneInputs(newInputs);
-                                }}
-                                onBlur={() => {
-                                  const value = parseFloat(
-                                    springBoneInputs[
-                                      bone.name
-                                    ]?.stiffness?.replace(",", ".") || "0"
-                                  );
-                                  if (!isNaN(value)) {
-                                    onSpringBoneSettingChange?.(
-                                      bone.name,
-                                      "stiffness",
-                                      value
-                                    );
-                                  }
-                                }}
-                                className="w-16 h-7 text-xs"
-                              />
-                            </div>
-                          </div>
-
-                          {/* Gravity Dir */}
-                          <div className="space-y-2">
-                            <Label className="text-xs font-semibold">
-                              Gravity Dir
-                            </Label>
-                            <div className="grid grid-cols-3 gap-2">
-                              <div>
-                                <Label className="text-xs text-muted-foreground">
-                                  X
-                                </Label>
+                {springBones.length === 0 ? (
+                  <p className="text-sm text-muted-foreground">
+                    No spring bones available
+                  </p>
+                ) : (
+                  <div
+                    className={
+                      springBones.length > 10
+                        ? "bg-secondary/50 rounded-lg p-3 max-h-[400px] overflow-y-auto"
+                        : ""
+                    }
+                  >
+                    <Accordion
+                      type="single"
+                      collapsible
+                      className="w-full pl-2"
+                    >
+                      {springBones.map((bone) => (
+                        <AccordionItem key={bone.name} value={bone.name}>
+                          <AccordionTrigger className="text-sm py-2">
+                            {bone.name}
+                          </AccordionTrigger>
+                          <AccordionContent className="space-y-3 pb-2">
+                            {/* Drag Force */}
+                            <div className="space-y-1">
+                              <div className="flex items-center justify-between">
+                                <Label className="text-xs">DragForce</Label>
                                 <Input
                                   type="text"
                                   inputMode="decimal"
                                   value={
-                                    springBoneInputs[bone.name]?.gravityDirX ||
+                                    springBoneInputs[bone.name]?.dragForce ||
                                     "0"
                                   }
                                   onChange={(e) => {
@@ -605,80 +429,271 @@ export const VRMDatGUIControl = ({
                                         gravityDirY: "",
                                         gravityDirZ: "",
                                       };
-                                    newInputs[bone.name].gravityDirX =
+                                    newInputs[bone.name].dragForce =
                                       e.target.value;
                                     setSpringBoneInputs(newInputs);
                                   }}
-                                  className="w-full h-7 text-xs"
-                                />
-                              </div>
-                              <div>
-                                <Label className="text-xs text-muted-foreground">
-                                  Y
-                                </Label>
-                                <Input
-                                  type="text"
-                                  inputMode="decimal"
-                                  value={
-                                    springBoneInputs[bone.name]?.gravityDirY ||
-                                    "0"
-                                  }
-                                  onChange={(e) => {
-                                    const newInputs = { ...springBoneInputs };
-                                    if (!newInputs[bone.name])
-                                      newInputs[bone.name] = {
-                                        dragForce: "",
-                                        gravityPower: "",
-                                        hitRadius: "",
-                                        stiffness: "",
-                                        gravityDirX: "",
-                                        gravityDirY: "",
-                                        gravityDirZ: "",
-                                      };
-                                    newInputs[bone.name].gravityDirY =
-                                      e.target.value;
-                                    setSpringBoneInputs(newInputs);
+                                  onBlur={() => {
+                                    const value = parseFloat(
+                                      springBoneInputs[
+                                        bone.name
+                                      ]?.dragForce?.replace(",", ".") || "0"
+                                    );
+                                    if (!isNaN(value)) {
+                                      onSpringBoneSettingChange?.(
+                                        bone.name,
+                                        "dragForce",
+                                        value
+                                      );
+                                    }
                                   }}
-                                  className="w-full h-7 text-xs"
-                                />
-                              </div>
-                              <div>
-                                <Label className="text-xs text-muted-foreground">
-                                  Z
-                                </Label>
-                                <Input
-                                  type="text"
-                                  inputMode="decimal"
-                                  value={
-                                    springBoneInputs[bone.name]?.gravityDirZ ||
-                                    "0"
-                                  }
-                                  onChange={(e) => {
-                                    const newInputs = { ...springBoneInputs };
-                                    if (!newInputs[bone.name])
-                                      newInputs[bone.name] = {
-                                        dragForce: "",
-                                        gravityPower: "",
-                                        hitRadius: "",
-                                        stiffness: "",
-                                        gravityDirX: "",
-                                        gravityDirY: "",
-                                        gravityDirZ: "",
-                                      };
-                                    newInputs[bone.name].gravityDirZ =
-                                      e.target.value;
-                                    setSpringBoneInputs(newInputs);
-                                  }}
-                                  className="w-full h-7 text-xs"
+                                  className="w-16 h-7 text-xs"
                                 />
                               </div>
                             </div>
-                          </div>
-                        </AccordionContent>
-                      </AccordionItem>
-                    ))
-                  )}
-                </Accordion>
+
+                            {/* Gravity Power */}
+                            <div className="space-y-1">
+                              <div className="flex items-center justify-between">
+                                <Label className="text-xs">GravityPower</Label>
+                                <Input
+                                  type="text"
+                                  inputMode="decimal"
+                                  value={
+                                    springBoneInputs[bone.name]?.gravityPower ||
+                                    "0"
+                                  }
+                                  onChange={(e) => {
+                                    const newInputs = { ...springBoneInputs };
+                                    if (!newInputs[bone.name])
+                                      newInputs[bone.name] = {
+                                        dragForce: "",
+                                        gravityPower: "",
+                                        hitRadius: "",
+                                        stiffness: "",
+                                        gravityDirX: "",
+                                        gravityDirY: "",
+                                        gravityDirZ: "",
+                                      };
+                                    newInputs[bone.name].gravityPower =
+                                      e.target.value;
+                                    setSpringBoneInputs(newInputs);
+                                  }}
+                                  onBlur={() => {
+                                    const value = parseFloat(
+                                      springBoneInputs[
+                                        bone.name
+                                      ]?.gravityPower?.replace(",", ".") || "0"
+                                    );
+                                    if (!isNaN(value)) {
+                                      onSpringBoneSettingChange?.(
+                                        bone.name,
+                                        "gravityPower",
+                                        value
+                                      );
+                                    }
+                                  }}
+                                  className="w-16 h-7 text-xs"
+                                />
+                              </div>
+                            </div>
+
+                            {/* Hit Radius */}
+                            <div className="space-y-1">
+                              <div className="flex items-center justify-between">
+                                <Label className="text-xs">Hit Radius</Label>
+                                <Input
+                                  type="text"
+                                  inputMode="decimal"
+                                  value={
+                                    springBoneInputs[bone.name]?.hitRadius ||
+                                    "0"
+                                  }
+                                  onChange={(e) => {
+                                    const newInputs = { ...springBoneInputs };
+                                    if (!newInputs[bone.name])
+                                      newInputs[bone.name] = {
+                                        dragForce: "",
+                                        gravityPower: "",
+                                        hitRadius: "",
+                                        stiffness: "",
+                                        gravityDirX: "",
+                                        gravityDirY: "",
+                                        gravityDirZ: "",
+                                      };
+                                    newInputs[bone.name].hitRadius =
+                                      e.target.value;
+                                    setSpringBoneInputs(newInputs);
+                                  }}
+                                  onBlur={() => {
+                                    const value = parseFloat(
+                                      springBoneInputs[
+                                        bone.name
+                                      ]?.hitRadius?.replace(",", ".") || "0"
+                                    );
+                                    if (!isNaN(value)) {
+                                      onSpringBoneSettingChange?.(
+                                        bone.name,
+                                        "hitRadius",
+                                        value
+                                      );
+                                    }
+                                  }}
+                                  className="w-16 h-7 text-xs"
+                                />
+                              </div>
+                            </div>
+
+                            {/* Stiffness */}
+                            <div className="space-y-1">
+                              <div className="flex items-center justify-between">
+                                <Label className="text-xs">Stiffness</Label>
+                                <Input
+                                  type="text"
+                                  inputMode="decimal"
+                                  value={
+                                    springBoneInputs[bone.name]?.stiffness ||
+                                    "0"
+                                  }
+                                  onChange={(e) => {
+                                    const newInputs = { ...springBoneInputs };
+                                    if (!newInputs[bone.name])
+                                      newInputs[bone.name] = {
+                                        dragForce: "",
+                                        gravityPower: "",
+                                        hitRadius: "",
+                                        stiffness: "",
+                                        gravityDirX: "",
+                                        gravityDirY: "",
+                                        gravityDirZ: "",
+                                      };
+                                    newInputs[bone.name].stiffness =
+                                      e.target.value;
+                                    setSpringBoneInputs(newInputs);
+                                  }}
+                                  onBlur={() => {
+                                    const value = parseFloat(
+                                      springBoneInputs[
+                                        bone.name
+                                      ]?.stiffness?.replace(",", ".") || "0"
+                                    );
+                                    if (!isNaN(value)) {
+                                      onSpringBoneSettingChange?.(
+                                        bone.name,
+                                        "stiffness",
+                                        value
+                                      );
+                                    }
+                                  }}
+                                  className="w-16 h-7 text-xs"
+                                />
+                              </div>
+                            </div>
+
+                            {/* Gravity Dir */}
+                            <div className="space-y-2">
+                              <Label className="text-xs font-semibold">
+                                Gravity Dir
+                              </Label>
+                              <div className="grid grid-cols-3 gap-2">
+                                <div>
+                                  <Label className="text-xs text-muted-foreground">
+                                    X
+                                  </Label>
+                                  <Input
+                                    type="text"
+                                    inputMode="decimal"
+                                    value={
+                                      springBoneInputs[bone.name]
+                                        ?.gravityDirX || "0"
+                                    }
+                                    onChange={(e) => {
+                                      const newInputs = { ...springBoneInputs };
+                                      if (!newInputs[bone.name])
+                                        newInputs[bone.name] = {
+                                          dragForce: "",
+                                          gravityPower: "",
+                                          hitRadius: "",
+                                          stiffness: "",
+                                          gravityDirX: "",
+                                          gravityDirY: "",
+                                          gravityDirZ: "",
+                                        };
+                                      newInputs[bone.name].gravityDirX =
+                                        e.target.value;
+                                      setSpringBoneInputs(newInputs);
+                                    }}
+                                    className="w-full h-7 text-xs"
+                                  />
+                                </div>
+                                <div>
+                                  <Label className="text-xs text-muted-foreground">
+                                    Y
+                                  </Label>
+                                  <Input
+                                    type="text"
+                                    inputMode="decimal"
+                                    value={
+                                      springBoneInputs[bone.name]
+                                        ?.gravityDirY || "0"
+                                    }
+                                    onChange={(e) => {
+                                      const newInputs = { ...springBoneInputs };
+                                      if (!newInputs[bone.name])
+                                        newInputs[bone.name] = {
+                                          dragForce: "",
+                                          gravityPower: "",
+                                          hitRadius: "",
+                                          stiffness: "",
+                                          gravityDirX: "",
+                                          gravityDirY: "",
+                                          gravityDirZ: "",
+                                        };
+                                      newInputs[bone.name].gravityDirY =
+                                        e.target.value;
+                                      setSpringBoneInputs(newInputs);
+                                    }}
+                                    className="w-full h-7 text-xs"
+                                  />
+                                </div>
+                                <div>
+                                  <Label className="text-xs text-muted-foreground">
+                                    Z
+                                  </Label>
+                                  <Input
+                                    type="text"
+                                    inputMode="decimal"
+                                    value={
+                                      springBoneInputs[bone.name]
+                                        ?.gravityDirZ || "0"
+                                    }
+                                    onChange={(e) => {
+                                      const newInputs = { ...springBoneInputs };
+                                      if (!newInputs[bone.name])
+                                        newInputs[bone.name] = {
+                                          dragForce: "",
+                                          gravityPower: "",
+                                          hitRadius: "",
+                                          stiffness: "",
+                                          gravityDirX: "",
+                                          gravityDirY: "",
+                                          gravityDirZ: "",
+                                        };
+                                      newInputs[bone.name].gravityDirZ =
+                                        e.target.value;
+                                      setSpringBoneInputs(newInputs);
+                                    }}
+                                    className="w-full h-7 text-xs"
+                                  />
+                                </div>
+                              </div>
+                            </div>
+                          </AccordionContent>
+                        </AccordionItem>
+                      ))}
+                    </Accordion>
+                  </div>
+                )}
               </AccordionContent>
             </AccordionItem>
 
@@ -687,51 +702,61 @@ export const VRMDatGUIControl = ({
               <AccordionTrigger className="px-4 py-3 text-sm font-semibold">
                 Expressions
               </AccordionTrigger>
-              <AccordionContent className="px-4 pb-4 space-y-3">
+              <AccordionContent className="px-4 pb-4">
                 {expressions.length === 0 ? (
                   <p className="text-sm text-muted-foreground">
                     No expressions available
                   </p>
                 ) : (
-                  expressions.map((expression) => (
-                    <div key={expression.name} className="space-y-1">
-                      <div className="flex items-center justify-between">
-                        <Label className="text-xs">{expression.name}</Label>
-                        <Input
-                          type="text"
-                          inputMode="decimal"
-                          value={expressionInputs[expression.name] || "0"}
-                          onChange={(e) =>
-                            handleExpressionInputChange(
-                              expression.name,
-                              e.target.value
-                            )
-                          }
-                          onBlur={() =>
-                            handleExpressionInputBlur(
-                              expression.name,
-                              expression.value
-                            )
-                          }
-                          onKeyDown={(e) => {
-                            if (e.key === "Enter") {
-                              e.currentTarget.blur();
+                  <div
+                    className={
+                      expressions.length > 10
+                        ? "bg-secondary/50 rounded-lg p-3 max-h-[400px] overflow-y-auto"
+                        : ""
+                    }
+                  >
+                    <div className="space-y-3 pl-2">
+                      {expressions.map((expression) => (
+                        <div key={expression.name} className="space-y-1">
+                          <div className="flex items-center justify-between">
+                            <Label className="text-xs">{expression.name}</Label>
+                            <Input
+                              type="text"
+                              inputMode="decimal"
+                              value={expressionInputs[expression.name] || "0"}
+                              onChange={(e) =>
+                                handleExpressionInputChange(
+                                  expression.name,
+                                  e.target.value
+                                )
+                              }
+                              onBlur={() =>
+                                handleExpressionInputBlur(
+                                  expression.name,
+                                  expression.value
+                                )
+                              }
+                              onKeyDown={(e) => {
+                                if (e.key === "Enter") {
+                                  e.currentTarget.blur();
+                                }
+                              }}
+                              className="w-16 h-7 text-xs"
+                            />
+                          </div>
+                          <Slider
+                            min={0}
+                            max={1}
+                            step={0.01}
+                            value={[expression.value]}
+                            onValueChange={([value]) =>
+                              onExpressionChange?.(expression.name, value)
                             }
-                          }}
-                          className="w-16 h-7 text-xs"
-                        />
-                      </div>
-                      <Slider
-                        min={0}
-                        max={1}
-                        step={0.01}
-                        value={[expression.value]}
-                        onValueChange={([value]) =>
-                          onExpressionChange?.(expression.name, value)
-                        }
-                      />
+                          />
+                        </div>
+                      ))}
                     </div>
-                  ))
+                  </div>
                 )}
               </AccordionContent>
             </AccordionItem>
@@ -741,51 +766,61 @@ export const VRMDatGUIControl = ({
               <AccordionTrigger className="px-4 py-3 text-sm font-semibold">
                 Shapekeys
               </AccordionTrigger>
-              <AccordionContent className="px-4 pb-4 space-y-3">
+              <AccordionContent className="px-4 pb-4">
                 {shapeKeys.length === 0 ? (
                   <p className="text-sm text-muted-foreground">
                     No shapekeys available
                   </p>
                 ) : (
-                  shapeKeys.map((shapeKey) => (
-                    <div key={shapeKey.name} className="space-y-1">
-                      <div className="flex items-center justify-between">
-                        <Label className="text-xs">{shapeKey.name}</Label>
-                        <Input
-                          type="text"
-                          inputMode="decimal"
-                          value={shapeKeyInputs[shapeKey.name] || "0"}
-                          onChange={(e) =>
-                            handleShapeKeyInputChange(
-                              shapeKey.name,
-                              e.target.value
-                            )
-                          }
-                          onBlur={() =>
-                            handleShapeKeyInputBlur(
-                              shapeKey.name,
-                              shapeKey.value
-                            )
-                          }
-                          onKeyDown={(e) => {
-                            if (e.key === "Enter") {
-                              e.currentTarget.blur();
+                  <div
+                    className={
+                      shapeKeys.length > 10
+                        ? "bg-secondary/50 rounded-lg p-3 max-h-[400px] overflow-y-auto"
+                        : ""
+                    }
+                  >
+                    <div className="space-y-3 pl-2">
+                      {shapeKeys.map((shapeKey) => (
+                        <div key={shapeKey.name} className="space-y-1">
+                          <div className="flex items-center justify-between">
+                            <Label className="text-xs">{shapeKey.name}</Label>
+                            <Input
+                              type="text"
+                              inputMode="decimal"
+                              value={shapeKeyInputs[shapeKey.name] || "0"}
+                              onChange={(e) =>
+                                handleShapeKeyInputChange(
+                                  shapeKey.name,
+                                  e.target.value
+                                )
+                              }
+                              onBlur={() =>
+                                handleShapeKeyInputBlur(
+                                  shapeKey.name,
+                                  shapeKey.value
+                                )
+                              }
+                              onKeyDown={(e) => {
+                                if (e.key === "Enter") {
+                                  e.currentTarget.blur();
+                                }
+                              }}
+                              className="w-16 h-7 text-xs"
+                            />
+                          </div>
+                          <Slider
+                            min={0}
+                            max={1}
+                            step={0.01}
+                            value={[shapeKey.value]}
+                            onValueChange={([value]) =>
+                              onShapeKeyChange?.(shapeKey.name, value)
                             }
-                          }}
-                          className="w-16 h-7 text-xs"
-                        />
-                      </div>
-                      <Slider
-                        min={0}
-                        max={1}
-                        step={0.01}
-                        value={[shapeKey.value]}
-                        onValueChange={([value]) =>
-                          onShapeKeyChange?.(shapeKey.name, value)
-                        }
-                      />
+                          />
+                        </div>
+                      ))}
                     </div>
-                  ))
+                  </div>
                 )}
               </AccordionContent>
             </AccordionItem>
