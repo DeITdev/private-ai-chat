@@ -6,6 +6,10 @@ import { FBXLoader } from "three/addons/loaders/FBXLoader.js";
 import { VRMLoaderPlugin, VRMUtils } from "@pixiv/three-vrm";
 import type { VRM } from "@pixiv/three-vrm";
 import { remapMixamoAnimationToVrm } from "../utils/remapMixamoAnimationToVrm";
+import {
+  BoneManipulationController,
+  type BoneManipulationMode,
+} from "../utils/boneManipulation";
 
 interface PoseData {
   name?: string;
@@ -41,6 +45,7 @@ export interface VRMViewerRef {
   }>;
   setShapeKey: (name: string, value: number) => void;
   getCurrentPoseData: () => PoseData | null;
+  setBoneManipulationMode: (mode: BoneManipulationMode) => void;
 }
 
 export const VRMViewer = forwardRef<VRMViewerRef>((_, ref) => {
@@ -75,6 +80,9 @@ export const VRMViewer = forwardRef<VRMViewerRef>((_, ref) => {
   );
   const isRightMouseDownRef = useRef<boolean>(false);
   const lastMousePositionRef = useRef<{ x: number; y: number }>({ x: 0, y: 0 });
+  const boneManipulationControllerRef =
+    useRef<BoneManipulationController | null>(null);
+  const rendererRef = useRef<THREE.WebGLRenderer | null>(null);
 
   useImperativeHandle(ref, () => ({
     setExpression: (name: string, value: number) => {
@@ -699,6 +707,27 @@ export const VRMViewer = forwardRef<VRMViewerRef>((_, ref) => {
 
       return poseData;
     },
+    setBoneManipulationMode: (mode: BoneManipulationMode) => {
+      if (
+        !vrmRef.current ||
+        !sceneRef.current ||
+        !cameraRef.current ||
+        !rendererRef.current
+      )
+        return;
+
+      // Create controller if it doesn't exist
+      if (!boneManipulationControllerRef.current) {
+        boneManipulationControllerRef.current = new BoneManipulationController(
+          vrmRef.current,
+          sceneRef.current,
+          cameraRef.current,
+          rendererRef.current
+        );
+      }
+
+      boneManipulationControllerRef.current.setMode(mode);
+    },
   }));
 
   const playAnimation = (clip: THREE.AnimationClip) => {
@@ -782,6 +811,7 @@ export const VRMViewer = forwardRef<VRMViewerRef>((_, ref) => {
     renderer.setSize(width, height);
     renderer.setPixelRatio(Math.min(window.devicePixelRatio, isMobile ? 2 : 3)); // Limit pixel ratio on mobile
     renderer.outputColorSpace = THREE.SRGBColorSpace;
+    rendererRef.current = renderer;
 
     // Add WebGL context loss/restore handlers
     const canvas = canvasRef.current;
@@ -874,6 +904,11 @@ export const VRMViewer = forwardRef<VRMViewerRef>((_, ref) => {
         vrmRef.current.update(delta);
       }
 
+      // Update bone manipulation controller
+      if (boneManipulationControllerRef.current) {
+        boneManipulationControllerRef.current.update();
+      }
+
       // Update animation mixer
       if (mixerRef.current) {
         mixerRef.current.update(delta);
@@ -949,15 +984,33 @@ export const VRMViewer = forwardRef<VRMViewerRef>((_, ref) => {
       }
     };
 
+    const handleTransformDragging = (event: Event) => {
+      const customEvent = event as CustomEvent<boolean>;
+      if (controlsRef.current) {
+        controlsRef.current.enabled = !customEvent.detail;
+      }
+    };
+
     canvas.addEventListener("mousedown", handleMouseDown);
     canvas.addEventListener("mousemove", handleMouseMove);
     canvas.addEventListener("mouseup", handleMouseUp);
     canvas.addEventListener("contextmenu", handleContextMenu);
+    canvas.addEventListener(
+      "transform-dragging",
+      handleTransformDragging as EventListener
+    );
 
     // Cleanup
     return () => {
       window.removeEventListener("resize", handleResize);
       canvas.removeEventListener("mousedown", handleMouseDown);
+      canvas.removeEventListener("mousemove", handleMouseMove);
+      canvas.removeEventListener("mouseup", handleMouseUp);
+      canvas.removeEventListener("contextmenu", handleContextMenu);
+      canvas.removeEventListener(
+        "transform-dragging",
+        handleTransformDragging as EventListener
+      );
       canvas.removeEventListener("mousemove", handleMouseMove);
       canvas.removeEventListener("mouseup", handleMouseUp);
       canvas.removeEventListener("contextmenu", handleContextMenu);
@@ -972,6 +1025,12 @@ export const VRMViewer = forwardRef<VRMViewerRef>((_, ref) => {
       renderer.dispose();
       controls.dispose();
       scene.clear();
+
+      // Cleanup bone manipulation controller
+      if (boneManipulationControllerRef.current) {
+        boneManipulationControllerRef.current.dispose();
+        boneManipulationControllerRef.current = null;
+      }
 
       // Revoke all blob URLs on unmount
       blobUrlsToCleanup.forEach((blobUrl) => {

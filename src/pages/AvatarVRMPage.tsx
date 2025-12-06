@@ -436,7 +436,9 @@ const AvatarPage = () => {
 
   const handleBoneManipulationModeChange = (mode: "off" | "ik" | "fk") => {
     console.log("Bone manipulation mode changed to:", mode);
-    // Implement bone manipulation mode logic here
+    if (vrmViewerRef.current) {
+      vrmViewerRef.current.setBoneManipulationMode(mode);
+    }
   };
 
   const handleExpressionChange = (name: string, value: number) => {
