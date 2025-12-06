@@ -7,6 +7,13 @@ import { VRMLoaderPlugin, VRMUtils } from "@pixiv/three-vrm";
 import type { VRM } from "@pixiv/three-vrm";
 import { remapMixamoAnimationToVrm } from "../utils/remapMixamoAnimationToVrm";
 
+interface PoseData {
+  name?: string;
+  code?: string;
+  vrmVersion?: string;
+  data?: Record<string, { rotation: [number, number, number, number] }>;
+}
+
 export interface VRMViewerRef {
   setExpression: (name: string, value: number) => void;
   loadVRM: (
@@ -19,6 +26,21 @@ export interface VRMViewerRef {
   resetCameraPosition: () => void;
   setCameraFollowCharacter: (enabled: boolean) => void;
   setHideGridAxes: (hide: boolean) => void;
+  loadPose: (poseData: PoseData) => void;
+  getExpressions: () => Array<{ name: string; value: number }>;
+  getShapeKeys: () => Array<{ name: string; value: number }>;
+  getSpringBones: () => Array<{
+    name: string;
+    settings: {
+      dragForce: number;
+      gravityPower: number;
+      hitRadius: number;
+      stiffness: number;
+      gravityDir: { x: number; y: number; z: number };
+    };
+  }>;
+  setShapeKey: (name: string, value: number) => void;
+  getCurrentPoseData: () => PoseData | null;
 }
 
 export const VRMViewer = forwardRef<VRMViewerRef>((_, ref) => {
@@ -372,12 +394,310 @@ export const VRMViewer = forwardRef<VRMViewerRef>((_, ref) => {
           );
           console.log("VRM model loaded!", vrm);
 
-          // Load breathing idle animation
-          loadBreathingAnimation(vrm);
-
           resolve();
         }
       });
+    },
+    loadPose: (poseData: PoseData) => {
+      if (!vrmRef.current) return;
+
+      // Apply pose data to VRM bones
+      if (poseData.data) {
+        Object.entries(poseData.data).forEach(([boneName, boneData]) => {
+          const humanBone = vrmRef.current?.humanoid?.getNormalizedBoneNode(
+            boneName as keyof typeof vrmRef.current.humanoid.humanBones
+          );
+          if (humanBone && boneData.rotation) {
+            const [x, y, z, w] = boneData.rotation;
+            humanBone.quaternion.set(x, y, z, w);
+          }
+        });
+      }
+    },
+    getExpressions: () => {
+      if (!vrmRef.current?.expressionManager) return [];
+
+      const expressions: Array<{ name: string; value: number }> = [];
+      const manager = vrmRef.current.expressionManager;
+
+      // Get all expression names from the manager
+      const expressionMap = (
+        manager as {
+          expressionMap: Map<string, unknown> | Record<string, unknown>;
+        }
+      ).expressionMap;
+
+      // Handle both Map and Object types
+      if (expressionMap instanceof Map) {
+        for (const [name] of expressionMap.entries()) {
+          expressions.push({
+            name,
+            value: manager.getValue(name) || 0,
+          });
+        }
+      } else if (expressionMap && typeof expressionMap === "object") {
+        // It's a plain object
+        for (const name of Object.keys(expressionMap)) {
+          expressions.push({
+            name,
+            value: manager.getValue(name) || 0,
+          });
+        }
+      }
+
+      return expressions;
+    },
+    getShapeKeys: () => {
+      // Get actual morph targets (blend shapes) from meshes
+      if (!vrmRef.current) return [];
+
+      const shapeKeys: Array<{ name: string; value: number }> = [];
+      const morphTargetNames = new Set<string>();
+
+      // Traverse the scene to find all meshes with morph targets
+      type MeshWithMorphTargets = THREE.Mesh & {
+        morphTargetDictionary?: Record<string, number>;
+        morphTargetInfluences?: number[];
+      };
+
+      vrmRef.current.scene.traverse((obj: THREE.Object3D) => {
+        if ("isMesh" in obj && obj.isMesh) {
+          const mesh = obj as MeshWithMorphTargets;
+          if (mesh.morphTargetDictionary && mesh.morphTargetInfluences) {
+            // Get all morph target names from this mesh
+            Object.keys(mesh.morphTargetDictionary).forEach((name) => {
+              morphTargetNames.add(name);
+            });
+          }
+        }
+      });
+
+      // Get the first mesh with morph targets to read values
+      let meshDict: Record<string, number> | undefined;
+      let meshInfluences: number[] | undefined;
+
+      vrmRef.current.scene.traverse((obj: THREE.Object3D) => {
+        if (!meshDict && "isMesh" in obj && obj.isMesh) {
+          const mesh = obj as MeshWithMorphTargets;
+          if (mesh.morphTargetDictionary && mesh.morphTargetInfluences) {
+            meshDict = mesh.morphTargetDictionary;
+            meshInfluences = mesh.morphTargetInfluences;
+          }
+        }
+      });
+
+      // Build the shape keys list
+      if (meshDict && meshInfluences) {
+        morphTargetNames.forEach((name) => {
+          const index = meshDict![name];
+          const value = meshInfluences![index] || 0;
+          shapeKeys.push({ name, value });
+        });
+      }
+
+      return shapeKeys;
+    },
+    getSpringBones: () => {
+      if (!vrmRef.current) return [];
+
+      const springBones: Array<{
+        name: string;
+        settings: {
+          dragForce: number;
+          gravityPower: number;
+          hitRadius: number;
+          stiffness: number;
+          gravityDir: { x: number; y: number; z: number };
+        };
+      }> = [];
+
+      const vrm = vrmRef.current;
+      const springBoneManager = (
+        vrm as {
+          springBoneManager?: { _sortedJoints?: unknown[]; joints?: unknown[] };
+        }
+      ).springBoneManager;
+
+      if (springBoneManager) {
+        // Use _sortedJoints which contains all the spring bone joints
+        const joints =
+          (
+            springBoneManager as {
+              _sortedJoints?: unknown[];
+              joints?: unknown[];
+            }
+          )._sortedJoints ||
+          (
+            springBoneManager as {
+              _sortedJoints?: unknown[];
+              joints?: unknown[];
+            }
+          ).joints ||
+          [];
+
+        if (Array.isArray(joints) && joints.length > 0) {
+          // Group joints by their root bone to avoid duplicates
+          const processedBones = new Set<string>();
+
+          joints.forEach((jointData: unknown, index: number) => {
+            const joint = jointData as {
+              bone?: { name?: string };
+              _bone?: { name?: string };
+              settings?: {
+                dragForce?: number;
+                gravityPower?: number;
+                hitRadius?: number;
+                stiffness?: number;
+                gravityDir?: { x?: number; y?: number; z?: number };
+              };
+              _settings?: {
+                dragForce?: number;
+                gravityPower?: number;
+                hitRadius?: number;
+                stiffness?: number;
+                gravityDir?: { x?: number; y?: number; z?: number };
+              };
+            };
+            const bone = joint.bone || joint._bone;
+            const settings = joint.settings || joint._settings;
+
+            if (bone && settings) {
+              const boneName = bone.name || `Spring Bone ${index + 1}`;
+
+              // Only add unique bones
+              if (!processedBones.has(boneName)) {
+                processedBones.add(boneName);
+
+                springBones.push({
+                  name: boneName,
+                  settings: {
+                    dragForce: settings.dragForce ?? 0.5,
+                    gravityPower: settings.gravityPower ?? 0,
+                    hitRadius: settings.hitRadius ?? 0.02,
+                    stiffness: settings.stiffness ?? 1,
+                    gravityDir: {
+                      x: settings.gravityDir?.x ?? 0,
+                      y: settings.gravityDir?.y ?? -1,
+                      z: settings.gravityDir?.z ?? 0,
+                    },
+                  },
+                });
+              }
+            }
+          });
+        }
+      }
+
+      return springBones;
+    },
+    setShapeKey: (name: string, value: number) => {
+      if (!vrmRef.current) return;
+
+      // Apply the morph target value to all meshes that have it
+      vrmRef.current.scene.traverse((obj: THREE.Object3D) => {
+        if ("isMesh" in obj && obj.isMesh) {
+          const mesh = obj as THREE.Mesh & {
+            morphTargetDictionary?: Record<string, number>;
+            morphTargetInfluences?: number[];
+          };
+          if (mesh.morphTargetDictionary && mesh.morphTargetInfluences) {
+            const index = mesh.morphTargetDictionary[name];
+            if (index !== undefined) {
+              mesh.morphTargetInfluences[index] = value;
+            }
+          }
+        }
+      });
+    },
+    getCurrentPoseData: () => {
+      if (!vrmRef.current) return null;
+
+      const poseData: PoseData = {
+        name: "Custom Pose",
+        code: crypto.randomUUID(),
+        vrmVersion: "0",
+        data: {},
+      };
+
+      // Get all humanoid bones
+      const humanoid = vrmRef.current.humanoid;
+      if (humanoid && poseData.data) {
+        const boneNames = [
+          "hips",
+          "spine",
+          "chest",
+          "upperChest",
+          "neck",
+          "head",
+          "leftShoulder",
+          "leftUpperArm",
+          "leftLowerArm",
+          "leftHand",
+          "rightShoulder",
+          "rightUpperArm",
+          "rightLowerArm",
+          "rightHand",
+          "leftUpperLeg",
+          "leftLowerLeg",
+          "leftFoot",
+          "leftToes",
+          "rightUpperLeg",
+          "rightLowerLeg",
+          "rightFoot",
+          "rightToes",
+          "leftEye",
+          "rightEye",
+          "jaw",
+          "leftThumbProximal",
+          "leftThumbIntermediate",
+          "leftThumbDistal",
+          "leftIndexProximal",
+          "leftIndexIntermediate",
+          "leftIndexDistal",
+          "leftMiddleProximal",
+          "leftMiddleIntermediate",
+          "leftMiddleDistal",
+          "leftRingProximal",
+          "leftRingIntermediate",
+          "leftRingDistal",
+          "leftLittleProximal",
+          "leftLittleIntermediate",
+          "leftLittleDistal",
+          "rightThumbProximal",
+          "rightThumbIntermediate",
+          "rightThumbDistal",
+          "rightIndexProximal",
+          "rightIndexIntermediate",
+          "rightIndexDistal",
+          "rightMiddleProximal",
+          "rightMiddleIntermediate",
+          "rightMiddleDistal",
+          "rightRingProximal",
+          "rightRingIntermediate",
+          "rightRingDistal",
+          "rightLittleProximal",
+          "rightLittleIntermediate",
+          "rightLittleDistal",
+        ];
+
+        boneNames.forEach((boneName) => {
+          const bone = humanoid.getNormalizedBoneNode(
+            boneName as keyof typeof humanoid.humanBones
+          );
+          if (bone && poseData.data) {
+            poseData.data[boneName] = {
+              rotation: [
+                bone.quaternion.x,
+                bone.quaternion.y,
+                bone.quaternion.z,
+                bone.quaternion.w,
+              ],
+            };
+          }
+        });
+      }
+
+      return poseData;
     },
   }));
 
@@ -402,42 +722,6 @@ export const VRMViewer = forwardRef<VRMViewerRef>((_, ref) => {
     action.play();
 
     currentAnimationRef.current = action;
-  };
-
-  const loadBreathingAnimation = (vrm: VRM) => {
-    const fbxLoader = new FBXLoader();
-    fbxLoader.load(
-      "/models/animations/Breathing_Idle.fbx",
-      (fbx) => {
-        console.log("🎬 Breathing Idle FBX loaded");
-
-        // Remap Mixamo animation to VRM
-        const vrmAnimationClip = remapMixamoAnimationToVrm(vrm, fbx);
-
-        // Cache the animation
-        loadedAnimationsRef.current.set(
-          "/models/animations/Breathing_Idle.fbx",
-          vrmAnimationClip
-        );
-
-        // Create animation mixer for VRM model
-        const mixer = new THREE.AnimationMixer(vrm.scene);
-        mixerRef.current = mixer;
-
-        // Play the animation with slower speed (0.5x = half speed)
-        const action = mixer.clipAction(vrmAnimationClip);
-        action.timeScale = 0.5;
-        action.play();
-
-        currentAnimationRef.current = action;
-
-        console.log("✨ Breathing animation playing at 0.5x speed");
-      },
-      undefined,
-      (error) => {
-        console.error("Error loading breathing animation:", error);
-      }
-    );
   };
 
   useEffect(() => {

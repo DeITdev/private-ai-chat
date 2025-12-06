@@ -129,7 +129,7 @@ export const DatGUIControl = ({
   return (
     <>
       {showControls ? (
-        <div className="absolute top-20 right-4 w-[280px] max-h-[calc(100%-100px)] overflow-y-auto bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/90 border rounded-lg shadow-lg z-[45]">
+        <div className="absolute top-20 right-4 w-[200px] md:w-[280px] lg:w-[320px] max-h-[calc(100%-100px)] overflow-y-auto bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/90 border rounded-lg shadow-lg z-[45]">
           <Accordion type="multiple" defaultValue={[]} className="w-full">
             {/* Display Controls */}
             <AccordionItem value="display">

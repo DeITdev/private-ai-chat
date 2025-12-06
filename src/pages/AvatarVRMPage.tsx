@@ -1,5 +1,6 @@
 import { useState, useRef, useEffect } from "react";
 import { VRMViewer, VRMViewerRef } from "~/components/VRMViewer";
+import { VRMDatGUIControl } from "~/components/VRMDatGUIControl";
 import {
   Dock,
   DockIcon,
@@ -53,6 +54,26 @@ const AvatarPage = () => {
   const [cameraFollowCharacter, setCameraFollowCharacter] = useState(false);
   const [hideGridAxes, setHideGridAxes] = useState(false);
   const [viewerMode, setViewerMode] = useState<"vrm" | "gltf">("vrm");
+
+  // VRM Control states
+  const [expressions, setExpressions] = useState<
+    Array<{ name: string; value: number }>
+  >([]);
+  const [shapeKeys, setShapeKeys] = useState<
+    Array<{ name: string; value: number }>
+  >([]);
+  const [springBones, setSpringBones] = useState<
+    Array<{
+      name: string;
+      settings: {
+        dragForce: number;
+        gravityPower: number;
+        hitRadius: number;
+        stiffness: number;
+        gravityDir: { x: number; y: number; z: number };
+      };
+    }>
+  >([]);
 
   const mediaRecorderRef = useRef<MediaRecorder | null>(null);
   const audioChunksRef = useRef<Blob[]>([]);
@@ -350,6 +371,10 @@ const AvatarPage = () => {
         setIsVRMLoaded(true);
         setSelectedAvatar(avatarPath);
         setHasLoadedInitially(true); // Mark as loaded to prevent useEffect from re-running
+
+        // Update VRM data for controls
+        setTimeout(() => updateVRMData(), 100);
+
         console.log("✅ Avatar switched successfully!");
       }
     } catch (error) {
@@ -380,6 +405,78 @@ const AvatarPage = () => {
       navigate("/avatar-gltf");
     } else {
       setViewerMode("vrm");
+    }
+  };
+
+  // Update VRM data for controls
+  const updateVRMData = () => {
+    if (vrmViewerRef.current) {
+      const newExpressions = vrmViewerRef.current.getExpressions();
+      const newShapeKeys = vrmViewerRef.current.getShapeKeys();
+      const newSpringBones = vrmViewerRef.current.getSpringBones();
+
+      console.log("📊 Retrieved expressions:", newExpressions);
+      console.log("📊 Retrieved shapeKeys:", newShapeKeys);
+      console.log("📊 Retrieved springBones:", newSpringBones);
+
+      setExpressions(newExpressions);
+      setShapeKeys(newShapeKeys);
+      setSpringBones(newSpringBones);
+
+      console.log("✅ State updated");
+    }
+  };
+
+  // VRM Control Handlers
+  const handlePoseLoad = (poseData: any) => {
+    if (vrmViewerRef.current) {
+      vrmViewerRef.current.loadPose(poseData);
+    }
+  };
+
+  const handleBoneManipulationModeChange = (mode: "off" | "ik" | "fk") => {
+    console.log("Bone manipulation mode changed to:", mode);
+    // Implement bone manipulation mode logic here
+  };
+
+  const handleExpressionChange = (name: string, value: number) => {
+    if (vrmViewerRef.current) {
+      vrmViewerRef.current.setExpression(name, value);
+      // Update local state
+      setExpressions((prev) =>
+        prev.map((exp) => (exp.name === name ? { ...exp, value } : exp))
+      );
+    }
+  };
+
+  const handleShapeKeyChange = (name: string, value: number) => {
+    if (vrmViewerRef.current) {
+      vrmViewerRef.current.setShapeKey(name, value);
+      // Update local state
+      setShapeKeys((prev) =>
+        prev.map((key) => (key.name === name ? { ...key, value } : key))
+      );
+    }
+  };
+
+  const handleSpringBoneSettingChange = (
+    boneName: string,
+    setting: string,
+    value: number
+  ) => {
+    console.log(`Spring bone ${boneName} ${setting} changed to:`, value);
+    // Spring bone settings would need to be applied via VRM spring bone manager
+    // This is more advanced and may require direct access to the VRM spring bone system
+  };
+
+  const handleSavePose = (poseName: string) => {
+    if (vrmViewerRef.current) {
+      const poseData = vrmViewerRef.current.getCurrentPoseData();
+      if (poseData) {
+        poseData.name = poseName;
+        console.log("Saved pose:", poseData);
+        // You could save this to localStorage or a database
+      }
     }
   };
 
@@ -420,6 +517,10 @@ const AvatarPage = () => {
           });
           setIsLoading(false);
           setIsVRMLoaded(true);
+
+          // Update VRM data for controls
+          setTimeout(() => updateVRMData(), 100);
+
           console.log("✅ VRM model loaded successfully!");
           // Reset file input after successful upload
           event.target.value = "";
@@ -537,6 +638,9 @@ const AvatarPage = () => {
             if (skipTimeoutRef.current) {
               clearTimeout(skipTimeoutRef.current);
             }
+
+            // Update VRM data for controls
+            setTimeout(() => updateVRMData(), 100);
           }
         } catch {
           if (!cancelled && !loadCancelledRef.current) {
@@ -901,6 +1005,21 @@ const AvatarPage = () => {
         onSelectItem={handleAnimationSelect}
         descriptionId="animation-dialog-description"
       />
+
+      {/* VRM DatGUI Controls */}
+      {isVRMLoaded && (
+        <VRMDatGUIControl
+          onPoseLoad={handlePoseLoad}
+          onBoneManipulationModeChange={handleBoneManipulationModeChange}
+          onExpressionChange={handleExpressionChange}
+          onShapeKeyChange={handleShapeKeyChange}
+          onSpringBoneSettingChange={handleSpringBoneSettingChange}
+          onSavePose={handleSavePose}
+          expressions={expressions}
+          shapeKeys={shapeKeys}
+          springBones={springBones}
+        />
+      )}
 
       <audio ref={audioRef} className="hidden" />
       <input

@@ -88,3 +88,26 @@ export const predefinedAnimations = [
     thumbnail: "/images/default-thumbnail-3davatar.png",
   },
 ];
+
+export const predefinedPoses = [
+  {
+    name: "T-shape",
+    path: "/models/poses/T-shape.json",
+    thumbnail: "/images/default-thumbnail-3davatar.png",
+  },
+  {
+    name: "A-shape",
+    path: "/models/poses/A-shape.json",
+    thumbnail: "/images/default-thumbnail-3davatar.png",
+  },
+  {
+    name: "Standing",
+    path: "/models/poses/Standing.json",
+    thumbnail: "/images/default-thumbnail-3davatar.png",
+  },
+  {
+    name: "Double Peace",
+    path: "/models/poses/Double Peace.json",
+    thumbnail: "/images/default-thumbnail-3davatar.png",
+  },
+];
