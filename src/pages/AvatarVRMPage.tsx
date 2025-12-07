@@ -1,6 +1,7 @@
 import { useState, useRef, useEffect } from "react";
 import { VRMViewer, VRMViewerRef } from "~/components/VRMViewer";
 import { VRMDatGUIControl } from "~/components/VRMDatGUIControl";
+import { DockMenu } from "~/components/DockMenu";
 
 interface PoseData {
   name?: string;
@@ -8,20 +9,7 @@ interface PoseData {
   vrmVersion?: string;
   data?: Record<string, unknown>;
 }
-import {
-  Dock,
-  DockIcon,
-  DockItem,
-  DockLabel,
-} from "~/components/ui/shadcn-io/dock";
-import {
-  Mic,
-  Settings as SettingsIcon,
-  Home,
-  Upload,
-  ChevronDown,
-  Menu,
-} from "lucide-react";
+import { Settings as SettingsIcon, Upload, Menu } from "lucide-react";
 import { predefinedAvatars, predefinedAnimations } from "~/constants";
 import { Button } from "~/components/ui/button";
 import { Switch } from "~/components/ui/switch";
@@ -61,6 +49,7 @@ const AvatarPage = () => {
   const [cameraFollowCharacter, setCameraFollowCharacter] = useState(false);
   const [hideGridAxes, setHideGridAxes] = useState(false);
   const [viewerMode, setViewerMode] = useState<"vrm" | "gltf">("vrm");
+  const [animationSpeed, setAnimationSpeed] = useState(0.5);
 
   // VRM Control states
   const [expressions, setExpressions] = useState<
@@ -496,6 +485,36 @@ const AvatarPage = () => {
     }
   };
 
+  const handleAnimationPlay = async (animationUrl: string) => {
+    if (vrmViewerRef.current) {
+      try {
+        await vrmViewerRef.current.loadAnimation(animationUrl);
+        console.log("✅ Animation loaded:", animationUrl);
+      } catch (error) {
+        console.error("❌ Failed to load animation:", error);
+      }
+    }
+  };
+
+  const handleAnimationSpeedChange = (speed: number) => {
+    setAnimationSpeed(speed);
+    if (vrmViewerRef.current) {
+      vrmViewerRef.current.setAnimationSpeed(speed);
+    }
+  };
+
+  const handleResetCharacter = () => {
+    if (vrmViewerRef.current) {
+      // Reset character position to origin and stop animation
+      vrmViewerRef.current.resetCharacterPosition();
+
+      // Reset camera position
+      vrmViewerRef.current.resetCameraPosition();
+
+      console.log("✅ Character reset to T-pose and origin position");
+    }
+  };
+
   const handleFileSelected = async (
     event: React.ChangeEvent<HTMLInputElement>
   ) => {
@@ -885,6 +904,14 @@ const AvatarPage = () => {
             >
               <span className="text-sm font-medium">Reset Camera Position</span>
             </DropdownMenuRadioItem>
+            {/* Reset Character Button */}
+            <DropdownMenuRadioItem
+              value="reset-character"
+              onClick={handleResetCharacter}
+              className="flex items-center justify-center py-3 cursor-pointer hover:bg-accent"
+            >
+              <span className="text-sm font-medium">Reset Character</span>
+            </DropdownMenuRadioItem>
             {/* Upload 3D Model */}
             <DropdownMenuRadioItem
               value="upload"
@@ -903,100 +930,15 @@ const AvatarPage = () => {
       <main className="flex-1 w-full overflow-hidden">
         <VRMViewer ref={vrmViewerRef} />
       </main>
-      <footer className="absolute bottom-0 left-0 right-0 z-10 flex justify-center items-end pb-4 lg:left-64">
-        {/* Dock with Action Buttons */}
-        <Dock magnification={100} distance={140}>
-          {/* Home Button */}
-          <DockItem>
-            <DockLabel>Home</DockLabel>
-            <DockIcon>
-              <button
-                onClick={() => navigate("/")}
-                className="h-full w-full flex items-center justify-center"
-              >
-                <Home className="h-full w-full text-foreground" />
-              </button>
-            </DockIcon>
-          </DockItem>
-
-          {/* Record Button with Microphone Selector */}
-          <DockItem className={isRecording ? "animate-pulse" : ""}>
-            <DockLabel>{isRecording ? "Stop" : "Record"}</DockLabel>
-            <DockIcon>
-              <div className="h-full w-full flex items-center justify-center relative">
-                <button
-                  onClick={handleToggleRecording}
-                  className="h-full w-full flex items-center justify-center"
-                >
-                  <Mic
-                    className={`h-full w-full ${
-                      isRecording ? "text-red-500" : "text-foreground"
-                    }`}
-                  />
-                </button>
-                {/* Microphone Selector Dropdown */}
-                <DropdownMenu>
-                  <DropdownMenuTrigger asChild>
-                    <button className="absolute right-0 top-1/2 -translate-y-1/2 translate-x-[calc(50%+8px)] flex items-center justify-center hover:opacity-70">
-                      <ChevronDown className="h-4 w-4 text-foreground" />
-                    </button>
-                  </DropdownMenuTrigger>
-                  <DropdownMenuContent align="start">
-                    {audioInputs.map((device) => (
-                      <DropdownMenuRadioItem
-                        key={device.deviceId}
-                        value={device.deviceId}
-                        onClick={() => setSelectedInputId(device.deviceId)}
-                      >
-                        {device.label ||
-                          `Microphone (${device.deviceId.slice(0, 5)})`}
-                      </DropdownMenuRadioItem>
-                    ))}
-                  </DropdownMenuContent>
-                </DropdownMenu>
-              </div>
-            </DockIcon>
-          </DockItem>
-
-          {/* Animation Button */}
-          <DockItem>
-            <DockLabel>Animation</DockLabel>
-            <DockIcon>
-              <button
-                onClick={() => setShowAnimationModal(true)}
-                className="h-full w-full flex items-center justify-center"
-              >
-                <svg
-                  viewBox="0 0 36 36"
-                  className="h-full w-full text-foreground"
-                  fill="none"
-                >
-                  <use href="/src/assets/sprite.svg#animation" />
-                </svg>
-              </button>
-            </DockIcon>
-          </DockItem>
-
-          {/* 3D Model Button */}
-          <DockItem>
-            <DockLabel>3D Avatar</DockLabel>
-            <DockIcon>
-              <button
-                onClick={() => setShowAvatarModal(true)}
-                className="h-full w-full flex items-center justify-center"
-              >
-                <svg
-                  viewBox="0 0 24 24"
-                  className="h-full w-full text-foreground"
-                  fill="none"
-                >
-                  <use href="/src/assets/sprite.svg#3D" />
-                </svg>
-              </button>
-            </DockIcon>
-          </DockItem>
-        </Dock>
-      </footer>
+      <DockMenu
+        isRecording={isRecording}
+        audioInputs={audioInputs}
+        onToggleRecording={handleToggleRecording}
+        onSelectAudioInput={setSelectedInputId}
+        onNavigateHome={() => navigate("/")}
+        onOpenAnimationModal={() => setShowAnimationModal(true)}
+        onOpenAvatarModal={() => setShowAvatarModal(true)}
+      />
 
       {/* 3D Avatar Selection Modal */}
       <SelectionModal
@@ -1031,9 +973,12 @@ const AvatarPage = () => {
           onShapeKeyChange={handleShapeKeyChange}
           onSpringBoneSettingChange={handleSpringBoneSettingChange}
           onSavePose={handleSavePose}
+          onAnimationPlay={handleAnimationPlay}
+          onAnimationSpeedChange={handleAnimationSpeedChange}
           expressions={expressions}
           shapeKeys={shapeKeys}
           springBones={springBones}
+          animationSpeed={animationSpeed}
         />
       )}
 

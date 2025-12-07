@@ -26,8 +26,10 @@ export interface VRMViewerRef {
   ) => Promise<void>;
   clearScene: () => void;
   loadAnimation: (animationPath: string) => Promise<void>;
+  setAnimationSpeed: (speed: number) => void;
   setCameraControlsEnabled: (enabled: boolean) => void;
   resetCameraPosition: () => void;
+  resetCharacterPosition: () => void;
   setCameraFollowCharacter: (enabled: boolean) => void;
   setHideGridAxes: (hide: boolean) => void;
   loadPose: (poseData: PoseData) => void;
@@ -107,6 +109,53 @@ export const VRMViewer = forwardRef<VRMViewerRef>((_, ref) => {
         controlsRef.current.update();
       }
     },
+    resetCharacterPosition: () => {
+      // Stop any playing animation (empty string stops animation)
+      if (currentAnimationRef.current) {
+        currentAnimationRef.current.stop();
+        currentAnimationRef.current = null;
+      }
+
+      // Reset VRM position to origin
+      if (vrmRef.current?.scene) {
+        vrmRef.current.scene.position.set(0, 0, 0);
+        vrmRef.current.scene.rotation.set(0, 0, 0);
+      }
+
+      // Reset all bone rotations to T-pose
+      if (vrmRef.current?.humanoid) {
+        const humanoid = vrmRef.current.humanoid;
+        const boneNames = [
+          "hips",
+          "spine",
+          "chest",
+          "upperChest",
+          "neck",
+          "head",
+          "leftShoulder",
+          "leftUpperArm",
+          "leftLowerArm",
+          "leftHand",
+          "rightShoulder",
+          "rightUpperArm",
+          "rightLowerArm",
+          "rightHand",
+          "leftUpperLeg",
+          "leftLowerLeg",
+          "leftFoot",
+          "rightUpperLeg",
+          "rightLowerLeg",
+          "rightFoot",
+        ] as const;
+
+        boneNames.forEach((boneName) => {
+          const bone = humanoid.getNormalizedBoneNode(boneName);
+          if (bone) {
+            bone.rotation.set(0, 0, 0);
+          }
+        });
+      }
+    },
     setCameraFollowCharacter: (enabled: boolean) => {
       cameraFollowCharacterRef.current = enabled;
       if (enabled) {
@@ -174,6 +223,11 @@ export const VRMViewer = forwardRef<VRMViewerRef>((_, ref) => {
           }
         );
       });
+    },
+    setAnimationSpeed: (speed: number) => {
+      if (currentAnimationRef.current) {
+        currentAnimationRef.current.timeScale = speed;
+      }
     },
     clearScene: () => {
       if (!sceneRef.current) return;

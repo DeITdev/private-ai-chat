@@ -29,6 +29,7 @@ three-gltf-viewer
 *.njsproj
 *.sln
 *.sw?
+*.zip
 
 # 3D Models
 Larasdyah.vrm

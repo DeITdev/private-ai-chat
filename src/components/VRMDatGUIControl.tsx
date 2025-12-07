@@ -10,7 +10,7 @@ import { Input } from "~/components/ui/input";
 import { Button } from "~/components/ui/button";
 import { Label } from "~/components/ui/label";
 import { Tabs, TabsList, TabsTrigger } from "~/components/ui/tabs";
-import { predefinedPoses } from "~/constants";
+import { predefinedPoses, predefinedAnimations } from "~/constants";
 import { Trash2, Download, Upload } from "lucide-react";
 
 interface PoseData {
@@ -52,6 +52,11 @@ interface CustomPose {
   data: PoseData;
 }
 
+interface Animation {
+  name: string;
+  url: string;
+}
+
 export interface VRMDatGUIControlRef {
   getExpressions: () => Expression[];
   getShapeKeys: () => ShapeKey[];
@@ -69,9 +74,12 @@ interface VRMDatGUIControlProps {
     value: number
   ) => void;
   onSavePose?: (poseName: string, poseData: PoseData) => void;
+  onAnimationPlay?: (animationUrl: string) => void;
+  onAnimationSpeedChange?: (speed: number) => void;
   expressions?: Expression[];
   shapeKeys?: ShapeKey[];
   springBones?: SpringBone[];
+  animationSpeed?: number;
 }
 
 export const VRMDatGUIControl = ({
@@ -81,9 +89,12 @@ export const VRMDatGUIControl = ({
   onShapeKeyChange,
   onSpringBoneSettingChange,
   onSavePose,
+  onAnimationPlay,
+  onAnimationSpeedChange,
   expressions = [],
   shapeKeys = [],
   springBones = [],
+  animationSpeed = 0.5,
 }: VRMDatGUIControlProps) => {
   const [showControls, setShowControls] = useState(false);
   const [customPoses, setCustomPoses] = useState<CustomPose[]>([]);
@@ -91,6 +102,11 @@ export const VRMDatGUIControl = ({
   const [newPoseName, setNewPoseName] = useState("");
   const [showAddPose, setShowAddPose] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const animationFileInputRef = useRef<HTMLInputElement>(null);
+  const [customAnimations, setCustomAnimations] = useState<Animation[]>([]);
+  const [animationSpeedInput, setAnimationSpeedInput] = useState(
+    animationSpeed.toString()
+  );
 
   // Expression input states
   const [expressionInputs, setExpressionInputs] = useState<
@@ -139,6 +155,10 @@ export const VRMDatGUIControl = ({
     });
     setSpringBoneInputs(newInputs);
   }, [springBones]);
+
+  useEffect(() => {
+    setAnimationSpeedInput(animationSpeed.toString());
+  }, [animationSpeed]);
 
   const handlePoseClick = async (posePath: string) => {
     try {
@@ -239,14 +259,170 @@ export const VRMDatGUIControl = ({
     }
   };
 
+  const handleAnimationFileUpload = (
+    event: React.ChangeEvent<HTMLInputElement>
+  ) => {
+    const file = event.target.files?.[0];
+    if (file && (file.name.endsWith(".fbx") || file.name.endsWith(".glb"))) {
+      const url = URL.createObjectURL(file);
+      const animationName = file.name.replace(/\.(fbx|glb)$/, "");
+      setCustomAnimations([...customAnimations, { name: animationName, url }]);
+    }
+    // Reset input
+    if (animationFileInputRef.current) {
+      animationFileInputRef.current.value = "";
+    }
+  };
+
+  const handleAnimationPlay = (animationUrl: string) => {
+    onAnimationPlay?.(animationUrl);
+  };
+
+  const handleAnimationSpeedInputChange = (value: string) => {
+    setAnimationSpeedInput(value);
+  };
+
+  const handleAnimationSpeedInputBlur = () => {
+    const value = parseFloat(animationSpeedInput.replace(",", ".") || "1");
+    if (!isNaN(value)) {
+      const clamped = Math.max(0, Math.min(2, value));
+      onAnimationSpeedChange?.(clamped);
+    } else {
+      setAnimationSpeedInput(animationSpeed.toString());
+    }
+  };
+
+  const handleDeleteCustomAnimation = (index: number) => {
+    const animation = customAnimations[index];
+    URL.revokeObjectURL(animation.url);
+    setCustomAnimations(customAnimations.filter((_, i) => i !== index));
+  };
+
   return (
     <>
       {showControls ? (
         <div className="absolute top-20 right-4 w-[200px] md:w-[280px] lg:w-[320px] max-h-[calc(100%-100px)] overflow-y-auto bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/90 border rounded-lg shadow-lg z-[45]">
           <Accordion type="multiple" defaultValue={[]} className="w-full">
+            {/* Animations Controls */}
+            <AccordionItem value="animations">
+              <AccordionTrigger className="px-4 py-3 text-base font-semibold">
+                Animations
+              </AccordionTrigger>
+              <AccordionContent className="px-4 pb-4 space-y-4">
+                {/* Upload/Drop Zone */}
+                <div className="border-2 border-dashed rounded-lg p-4 text-center">
+                  <input
+                    ref={animationFileInputRef}
+                    type="file"
+                    accept=".fbx,.glb"
+                    onChange={handleAnimationFileUpload}
+                    className="hidden"
+                  />
+                  <Upload className="mx-auto h-8 w-8 text-muted-foreground mb-2" />
+                  <p className="text-sm text-muted-foreground mb-2">
+                    Upload or drop <span className="text-primary">fbx,glb</span>{" "}
+                    file here
+                  </p>
+                  <Button
+                    onClick={() => animationFileInputRef.current?.click()}
+                    variant="outline"
+                    size="sm"
+                  >
+                    Choose File
+                  </Button>
+                </div>
+
+                {/* Animation Speed Control */}
+                <div className="space-y-2">
+                  <Label className="text-sm font-semibold">
+                    Animation Speed
+                  </Label>
+                  <div className="space-y-1">
+                    <div className="flex items-center justify-between">
+                      <Label className="text-xs">Speed</Label>
+                      <Input
+                        type="text"
+                        inputMode="decimal"
+                        value={animationSpeedInput}
+                        onChange={(e) =>
+                          handleAnimationSpeedInputChange(e.target.value)
+                        }
+                        onBlur={handleAnimationSpeedInputBlur}
+                        onKeyDown={(e) => {
+                          if (e.key === "Enter") {
+                            e.currentTarget.blur();
+                          }
+                        }}
+                        className="w-16 h-7 text-xs"
+                      />
+                    </div>
+                    <Slider
+                      min={0}
+                      max={2}
+                      step={0.01}
+                      value={[animationSpeed]}
+                      onValueChange={([value]) =>
+                        onAnimationSpeedChange?.(value)
+                      }
+                    />
+                  </div>
+                </div>
+
+                {/* Available Animations */}
+                <div className="space-y-2">
+                  <Label className="text-sm font-semibold">
+                    Available animations
+                  </Label>
+
+                  <div
+                    className={
+                      predefinedAnimations.length + customAnimations.length > 10
+                        ? "grid grid-cols-2 gap-2 max-h-[300px] overflow-y-auto p-2 bg-secondary/30 rounded-lg"
+                        : "grid grid-cols-2 gap-2"
+                    }
+                  >
+                    {/* Predefined Animations */}
+                    {predefinedAnimations.map((animation) => (
+                      <Button
+                        key={animation.path}
+                        onClick={() => handleAnimationPlay(animation.path)}
+                        variant="default"
+                        className="h-auto py-3 px-2 text-xs md:text-xs text-[10px] font-medium leading-tight"
+                        size="sm"
+                      >
+                        {animation.name}
+                      </Button>
+                    ))}
+
+                    {/* Custom Animations */}
+                    {customAnimations.map((animation, index) => (
+                      <div key={`custom-${index}`} className="relative group">
+                        <Button
+                          onClick={() => handleAnimationPlay(animation.url)}
+                          variant="secondary"
+                          className="w-full h-auto py-3 px-2 text-xs md:text-xs text-[10px] font-medium leading-tight"
+                          size="sm"
+                        >
+                          {animation.name}
+                        </Button>
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          onClick={() => handleDeleteCustomAnimation(index)}
+                          className="absolute -top-1 -right-1 h-5 w-5 p-0 opacity-0 group-hover:opacity-100 transition-opacity bg-destructive hover:bg-destructive/90 text-destructive-foreground rounded-full"
+                        >
+                          <Trash2 className="h-3 w-3" />
+                        </Button>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              </AccordionContent>
+            </AccordionItem>
+
             {/* Posing Controls */}
             <AccordionItem value="posing">
-              <AccordionTrigger className="px-4 py-3 text-sm font-semibold">
+              <AccordionTrigger className="px-4 py-3 text-base font-semibold">
                 Posing
               </AccordionTrigger>
               <AccordionContent className="px-4 pb-4 space-y-4">
@@ -282,11 +458,34 @@ export const VRMDatGUIControl = ({
                   {predefinedPoses.map((pose) => (
                     <div
                       key={pose.path}
-                      className="flex items-center justify-between p-2 bg-primary text-primary-foreground rounded hover:bg-primary/90 cursor-pointer"
-                      onClick={() => handlePoseClick(pose.path)}
+                      className="flex items-center justify-between p-2 bg-primary text-primary-foreground rounded hover:bg-primary/90"
                     >
-                      <span className="text-sm">{pose.name}</span>
-                      <Download className="h-4 w-4" />
+                      <span
+                        className="text-sm flex-1 cursor-pointer"
+                        onClick={() => handlePoseClick(pose.path)}
+                      >
+                        {pose.name}
+                      </span>
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        onClick={async (e) => {
+                          e.stopPropagation();
+                          try {
+                            const response = await fetch(pose.path);
+                            const poseData = await response.json();
+                            handleDownloadPose({
+                              name: pose.name,
+                              data: poseData,
+                            });
+                          } catch (error) {
+                            console.error("Failed to download pose:", error);
+                          }
+                        }}
+                        className="h-auto p-1 hover:bg-primary-foreground/20"
+                      >
+                        <Download className="h-4 w-4" />
+                      </Button>
                     </div>
                   ))}
 
@@ -379,7 +578,7 @@ export const VRMDatGUIControl = ({
 
             {/* Spring Bones Controls */}
             <AccordionItem value="springBones">
-              <AccordionTrigger className="px-4 py-3 text-sm font-semibold">
+              <AccordionTrigger className="px-4 py-3 text-base font-semibold">
                 Spring bones
               </AccordionTrigger>
               <AccordionContent className="px-4 pb-4">
@@ -699,7 +898,7 @@ export const VRMDatGUIControl = ({
 
             {/* Expressions Controls */}
             <AccordionItem value="expressions">
-              <AccordionTrigger className="px-4 py-3 text-sm font-semibold">
+              <AccordionTrigger className="px-4 py-3 text-base font-semibold">
                 Expressions
               </AccordionTrigger>
               <AccordionContent className="px-4 pb-4">
@@ -763,7 +962,7 @@ export const VRMDatGUIControl = ({
 
             {/* ShapeKeys Controls */}
             <AccordionItem value="shapekeys">
-              <AccordionTrigger className="px-4 py-3 text-sm font-semibold">
+              <AccordionTrigger className="px-4 py-3 text-base font-semibold">
                 Shapekeys
               </AccordionTrigger>
               <AccordionContent className="px-4 pb-4">

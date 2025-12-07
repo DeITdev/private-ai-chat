@@ -20,6 +20,7 @@ export interface GLTFViewerRef {
     onProgress?: (progress: number) => void
   ) => Promise<void>;
   clearScene: () => void;
+  resetCharacterPosition: () => void;
   setEnvironment: (envName: string) => void;
   setWireframe: (enabled: boolean) => void;
   playAnimation: (index: number) => void;
@@ -327,6 +328,22 @@ export const GLTFViewer = forwardRef<GLTFViewerRef, GLTFViewerProps>(
         }
 
         console.log("✅ Scene cleared");
+      },
+
+      resetCharacterPosition: () => {
+        // Stop any playing animation
+        if (mixerRef.current) {
+          mixerRef.current.stopAllAction();
+        }
+
+        // Reset model position and rotation to origin
+        if (contentRef.current) {
+          contentRef.current.position.set(0, 0, 0);
+          contentRef.current.rotation.set(0, 0, 0);
+          contentRef.current.scale.set(1, 1, 1);
+        }
+
+        console.log("✅ Character position reset");
       },
 
       setEnvironment: (envName: string) => {
