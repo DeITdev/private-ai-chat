@@ -17,7 +17,7 @@ import type {
   HTMLAttributes,
   KeyboardEventHandler,
 } from "react";
-import { Children } from "react";
+import { Children, useRef, useEffect } from "react";
 
 export type PromptInputProps = HTMLAttributes<HTMLFormElement>;
 
@@ -44,6 +44,8 @@ export const PromptInputTextarea = ({
   maxHeight = 164,
   ...props
 }: PromptInputTextareaProps) => {
+  const textareaRef = useRef<HTMLTextAreaElement>(null);
+
   const handleKeyDown: KeyboardEventHandler<HTMLTextAreaElement> = (e) => {
     if (e.key === "Enter") {
       if (e.shiftKey) {
@@ -60,8 +62,26 @@ export const PromptInputTextarea = ({
     }
   };
 
+  // Auto-resize textarea based on content
+  useEffect(() => {
+    const textarea = textareaRef.current;
+    if (!textarea) return;
+
+    const adjustHeight = () => {
+      textarea.style.height = "auto";
+      const newHeight = Math.min(
+        Math.max(textarea.scrollHeight, minHeight),
+        maxHeight
+      );
+      textarea.style.height = `${newHeight}px`;
+    };
+
+    adjustHeight();
+  }, [props.value, minHeight, maxHeight]);
+
   return (
     <Textarea
+      ref={textareaRef}
       className={cn(
         "w-full resize-none rounded-none border-none p-3 shadow-none outline-none ring-0",
         "field-sizing-content max-h-[6lh] bg-transparent dark:bg-transparent",
