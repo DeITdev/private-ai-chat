@@ -11,6 +11,7 @@ import {
   DropdownMenuTrigger,
   DropdownMenuRadioItem,
 } from "~/components/ui/dropdown-menu";
+import { ChatIcon, ThreeDIcon } from "~/assets";
 
 interface DockMenuProps {
   isRecording?: boolean;
@@ -18,7 +19,7 @@ interface DockMenuProps {
   onToggleRecording?: () => void;
   onSelectAudioInput?: (deviceId: string) => void;
   onNavigateHome?: () => void;
-  onOpenAnimationModal?: () => void;
+  onOpenChatPrompt?: () => void;
   onOpenAvatarModal?: () => void;
 }
 
@@ -28,7 +29,7 @@ export const DockMenu = ({
   onToggleRecording,
   onSelectAudioInput,
   onNavigateHome,
-  onOpenAnimationModal,
+  onOpenChatPrompt,
   onOpenAvatarModal,
 }: DockMenuProps) => {
   return (
@@ -91,22 +92,16 @@ export const DockMenu = ({
           </DockItem>
         )}
 
-        {/* Animation Button */}
-        {onOpenAnimationModal && (
+        {/* Chat Button */}
+        {onOpenChatPrompt && (
           <DockItem>
-            <DockLabel>Animation</DockLabel>
+            <DockLabel>Chat</DockLabel>
             <DockIcon>
               <button
-                onClick={onOpenAnimationModal}
+                onClick={onOpenChatPrompt}
                 className="h-full w-full flex items-center justify-center"
               >
-                <svg
-                  viewBox="0 0 36 36"
-                  className="h-full w-full text-foreground"
-                  fill="none"
-                >
-                  <use href="/src/assets/sprite.svg#animation" />
-                </svg>
+                <ChatIcon className="h-full w-full text-foreground" />
               </button>
             </DockIcon>
           </DockItem>
@@ -121,13 +116,7 @@ export const DockMenu = ({
                 onClick={onOpenAvatarModal}
                 className="h-full w-full flex items-center justify-center"
               >
-                <svg
-                  viewBox="0 0 24 24"
-                  className="h-full w-full text-foreground"
-                  fill="none"
-                >
-                  <use href="/src/assets/sprite.svg#3D" />
-                </svg>
+                <ThreeDIcon className="h-full w-full text-foreground" />
               </button>
             </DockIcon>
           </DockItem>

@@ -1,0 +1,209 @@
+"use client";
+
+import { useState, useEffect, useRef, type FormEventHandler } from "react";
+import {
+  PromptInput,
+  PromptInputButton,
+  PromptInputModelSelect,
+  PromptInputModelSelectContent,
+  PromptInputModelSelectItem,
+  PromptInputModelSelectTrigger,
+  PromptInputModelSelectValue,
+  PromptInputSubmit,
+  PromptInputTextarea,
+  PromptInputToolbar,
+  PromptInputTools,
+} from "~/components/ui/shadcn-io/ai/prompt-input";
+import { Paperclip, X } from "lucide-react";
+import { Button } from "~/components/ui/button";
+
+interface ChatPromptProps {
+  open: boolean;
+  onClose: () => void;
+}
+
+export const ChatPrompt = ({ open, onClose }: ChatPromptProps) => {
+  const [text, setText] = useState("");
+  const [selectedModel, setSelectedModel] = useState("mistral:7b");
+  const [availableModels, setAvailableModels] = useState<string[]>([]);
+  const [status, setStatus] = useState<
+    "submitted" | "streaming" | "ready" | "error"
+  >("ready");
+  const [attachments, setAttachments] = useState<File[]>([]);
+  const fileInputRef = useRef<HTMLInputElement>(null);
+  const containerRef = useRef<HTMLDivElement>(null);
+
+  // Fetch available Ollama models
+  useEffect(() => {
+    const fetchModels = async () => {
+      try {
+        const response = await fetch("http://localhost:5004/models");
+        const data = await response.json();
+        if (data.models) {
+          const modelNames = data.models.map(
+            (model: { name: string }) => model.name
+          );
+          setAvailableModels(modelNames);
+          if (modelNames.length > 0) {
+            setSelectedModel(modelNames[0]);
+          }
+        }
+      } catch (error) {
+        console.error("Failed to fetch models:", error);
+        // Fallback to default model
+        setAvailableModels(["mistral:7b"]);
+      }
+    };
+
+    if (open) {
+      fetchModels();
+    }
+  }, [open]);
+
+  const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const files = Array.from(e.target.files || []);
+    setAttachments((prev) => [...prev, ...files]);
+    if (fileInputRef.current) {
+      fileInputRef.current.value = "";
+    }
+  };
+
+  const handleRemoveAttachment = (index: number) => {
+    setAttachments((prev) => prev.filter((_, i) => i !== index));
+  };
+
+  const handleSubmit: FormEventHandler<HTMLFormElement> = async (event) => {
+    event.preventDefault();
+    if (!text.trim()) {
+      return;
+    }
+
+    setStatus("submitted");
+
+    try {
+      setTimeout(() => {
+        setStatus("streaming");
+      }, 200);
+
+      const response = await fetch("http://localhost:5004/chat", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          model: selectedModel,
+          messages: [{ role: "user", content: text }],
+          stream: false,
+        }),
+      });
+
+      const data = await response.json();
+      const assistantResponse = data.message?.content || "No response";
+
+      // TODO: Send response to TTS for character to speak
+      console.log("AI Response:", assistantResponse);
+
+      setStatus("ready");
+      setText("");
+      setAttachments([]);
+    } catch (error) {
+      console.error("Failed to send message:", error);
+      setStatus("error");
+      setTimeout(() => {
+        setStatus("ready");
+      }, 2000);
+    }
+  };
+
+  return (
+    <div
+      className={`
+      fixed inset-0 z-50 flex items-end justify-center pointer-events-none
+      transition-opacity duration-300
+      ${open ? "opacity-100" : "opacity-0 pointer-events-none"}
+    `}
+    >
+      <div
+        ref={containerRef}
+        className={`
+          pointer-events-auto mb-32 w-[95vw] sm:w-[500px] md:w-[600px] lg:w-[700px] lg:translate-x-32
+          transition-all duration-300 ease-out
+          ${open ? "translate-y-0 opacity-100" : "translate-y-8 opacity-0"}
+        `}
+      >
+        <PromptInput onSubmit={handleSubmit}>
+          {attachments.length > 0 && (
+            <div className="flex flex-wrap gap-2 p-3 border-b">
+              {attachments.map((file, index) => (
+                <div
+                  key={index}
+                  className="flex items-center gap-2 bg-muted rounded-md px-3 py-1.5 text-sm"
+                >
+                  <span className="truncate max-w-[200px]">{file.name}</span>
+                  <button
+                    type="button"
+                    onClick={() => handleRemoveAttachment(index)}
+                    className="hover:bg-background rounded-sm p-0.5"
+                  >
+                    <X className="h-3 w-3" />
+                  </button>
+                </div>
+              ))}
+            </div>
+          )}
+          <PromptInputTextarea
+            onChange={(e: React.ChangeEvent<HTMLTextAreaElement>) =>
+              setText(e.target.value)
+            }
+            value={text}
+            placeholder="Type your message..."
+          />
+          <PromptInputToolbar>
+            <PromptInputTools>
+              <input
+                ref={fileInputRef}
+                type="file"
+                multiple
+                onChange={handleFileSelect}
+                className="hidden"
+              />
+              <PromptInputButton
+                type="button"
+                onClick={() => fileInputRef.current?.click()}
+              >
+                <Paperclip className="h-4 w-4" />
+              </PromptInputButton>
+              <PromptInputModelSelect
+                onValueChange={setSelectedModel}
+                value={selectedModel}
+              >
+                <PromptInputModelSelectTrigger>
+                  <PromptInputModelSelectValue />
+                </PromptInputModelSelectTrigger>
+                <PromptInputModelSelectContent>
+                  {availableModels.map((model) => (
+                    <PromptInputModelSelectItem key={model} value={model}>
+                      {model}
+                    </PromptInputModelSelectItem>
+                  ))}
+                </PromptInputModelSelectContent>
+              </PromptInputModelSelect>
+            </PromptInputTools>
+            <div className="flex items-center gap-2">
+              <Button
+                type="button"
+                variant="ghost"
+                size="sm"
+                onClick={onClose}
+                className="text-muted-foreground hover:text-foreground"
+              >
+                Close Chat
+              </Button>
+              <PromptInputSubmit disabled={!text} status={status} />
+            </div>
+          </PromptInputToolbar>
+        </PromptInput>
+      </div>
+    </div>
+  );
+};

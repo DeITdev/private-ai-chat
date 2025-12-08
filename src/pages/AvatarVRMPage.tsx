@@ -2,6 +2,7 @@ import { useState, useRef, useEffect } from "react";
 import { VRMViewer, VRMViewerRef } from "~/components/VRMViewer";
 import { VRMDatGUIControl } from "~/components/VRMDatGUIControl";
 import { DockMenu } from "~/components/DockMenu";
+import { ChatPrompt } from "~/components/ChatPrompt";
 
 interface PoseData {
   name?: string;
@@ -10,7 +11,7 @@ interface PoseData {
   data?: Record<string, unknown>;
 }
 import { Settings as SettingsIcon, Upload, Menu } from "lucide-react";
-import { predefinedAvatars, predefinedAnimations } from "~/constants";
+import { predefinedAvatars } from "~/constants";
 import { Button } from "~/components/ui/button";
 import { Switch } from "~/components/ui/switch";
 import { Separator } from "~/components/ui/separator";
@@ -41,10 +42,7 @@ const AvatarPage = () => {
     "/models/vrm/HatsuneMikuNT.vrm"
   );
   const [hasLoadedInitially, setHasLoadedInitially] = useState(false);
-  const [showAnimationModal, setShowAnimationModal] = useState(false);
-  const [selectedAnimation, setSelectedAnimation] = useState(
-    "/models/animations/Breathing_Idle.fbx"
-  );
+  const [showChatPrompt, setShowChatPrompt] = useState(false);
   const [enableSmoothCamera, setEnableSmoothCamera] = useState(true);
   const [cameraFollowCharacter, setCameraFollowCharacter] = useState(false);
   const [hideGridAxes, setHideGridAxes] = useState(false);
@@ -377,22 +375,6 @@ const AvatarPage = () => {
       console.error("❌ Failed to switch avatar:", error);
       setIsLoading(false);
       setIsVRMLoaded(false);
-    }
-  };
-
-  const handleAnimationSelect = async (animationPath: string) => {
-    try {
-      console.log("🎭 Loading animation:", animationPath);
-      setShowAnimationModal(false);
-
-      if (vrmViewerRef.current) {
-        await vrmViewerRef.current.loadAnimation(animationPath);
-      }
-
-      setSelectedAnimation(animationPath);
-      console.log("✅ Animation loaded successfully!");
-    } catch (error) {
-      console.error("❌ Failed to load animation:", error);
     }
   };
 
@@ -936,8 +918,14 @@ const AvatarPage = () => {
         onToggleRecording={handleToggleRecording}
         onSelectAudioInput={setSelectedInputId}
         onNavigateHome={() => navigate("/")}
-        onOpenAnimationModal={() => setShowAnimationModal(true)}
+        onOpenChatPrompt={() => setShowChatPrompt((prev) => !prev)}
         onOpenAvatarModal={() => setShowAvatarModal(true)}
+      />
+
+      {/* Chat Prompt */}
+      <ChatPrompt
+        open={showChatPrompt}
+        onClose={() => setShowChatPrompt(false)}
       />
 
       {/* 3D Avatar Selection Modal */}
@@ -950,18 +938,6 @@ const AvatarPage = () => {
         selectedItem={selectedAvatar}
         onSelectItem={handleAvatarSelect}
         descriptionId="avatar-dialog-description"
-      />
-
-      {/* Animation Selection Modal */}
-      <SelectionModal
-        open={showAnimationModal}
-        onOpenChange={setShowAnimationModal}
-        title="Select Animation"
-        description="Choose from the available animations below"
-        items={predefinedAnimations}
-        selectedItem={selectedAnimation}
-        onSelectItem={handleAnimationSelect}
-        descriptionId="animation-dialog-description"
       />
 
       {/* VRM DatGUI Controls */}

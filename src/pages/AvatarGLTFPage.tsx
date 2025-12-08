@@ -1,6 +1,7 @@
 import { useState, useRef, useEffect } from "react";
 import { GLTFViewer, GLTFViewerRef } from "~/components/GLTFViewer";
 import { DockMenu } from "~/components/DockMenu";
+import { ChatPrompt } from "~/components/ChatPrompt";
 import { Upload, Menu, Settings as SettingsIcon } from "lucide-react";
 import { Button } from "~/components/ui/button";
 import { Switch } from "~/components/ui/switch";
@@ -12,7 +13,7 @@ import {
   DropdownMenuRadioItem,
 } from "~/components/ui/dropdown-menu";
 import { Tabs, TabsList, TabsTrigger } from "~/components/ui/tabs";
-import { predefinedAvatars, predefinedAnimations } from "~/constants";
+import { predefinedAvatars } from "~/constants";
 import { SelectionModal } from "~/components/SelectionModal";
 import { useNavigate, useLocation } from "react-router-dom";
 import { useSidebar } from "~/components/ui/sidebar";
@@ -29,10 +30,7 @@ const AvatarGLTFPage = () => {
   const [enableSmoothCamera, setEnableSmoothCamera] = useState(true);
   const [cameraFollowCharacter, setCameraFollowCharacter] = useState(false);
   const [viewerMode, setViewerMode] = useState<"vrm" | "gltf">("gltf");
-  const [showAnimationModal, setShowAnimationModal] = useState(false);
-  const [selectedAnimation, setSelectedAnimation] = useState(
-    "/models/animations/Breathing_Idle.fbx"
-  );
+  const [showChatPrompt, setShowChatPrompt] = useState(false);
   const [showAvatarModal, setShowAvatarModal] = useState(false);
   const [selectedAvatar, setSelectedAvatar] = useState(
     "/models/glb/Larasdyah_Character2.glb"
@@ -59,18 +57,6 @@ const AvatarGLTFPage = () => {
       await processFiles(files);
       // Reset file input after successful upload
       event.target.value = "";
-    }
-  };
-
-  const handleAnimationSelect = async (animationPath: string) => {
-    try {
-      console.log("🎭 Loading animation:", animationPath);
-      setShowAnimationModal(false);
-      // TODO: Implement animation loading for GLTF viewer if needed
-      setSelectedAnimation(animationPath);
-      console.log("✅ Animation loaded successfully!");
-    } catch (error) {
-      console.error("❌ Failed to load animation:", error);
     }
   };
 
@@ -615,8 +601,14 @@ const AvatarGLTFPage = () => {
         audioInputs={audioInputs}
         onSelectAudioInput={setSelectedInputId}
         onNavigateHome={() => navigate("/")}
-        onOpenAnimationModal={() => setShowAnimationModal(true)}
+        onOpenChatPrompt={() => setShowChatPrompt((prev) => !prev)}
         onOpenAvatarModal={() => setShowAvatarModal(true)}
+      />
+
+      {/* Chat Prompt */}
+      <ChatPrompt
+        open={showChatPrompt}
+        onClose={() => setShowChatPrompt(false)}
       />
 
       {/* 3D Avatar Selection Modal */}
@@ -629,18 +621,6 @@ const AvatarGLTFPage = () => {
         selectedItem={selectedAvatar}
         onSelectItem={handleAvatarSelect}
         descriptionId="avatar-dialog-description"
-      />
-
-      {/* Animation Selection Modal */}
-      <SelectionModal
-        open={showAnimationModal}
-        onOpenChange={setShowAnimationModal}
-        title="Select Animation"
-        description="Choose from the available animations below"
-        items={predefinedAnimations}
-        selectedItem={selectedAnimation}
-        onSelectItem={handleAnimationSelect}
-        descriptionId="animation-dialog-description"
       />
 
       <input
