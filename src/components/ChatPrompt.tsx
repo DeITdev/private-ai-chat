@@ -20,9 +20,14 @@ import { Button } from "~/components/ui/button";
 interface ChatPromptProps {
   open: boolean;
   onClose: () => void;
+  onAudioGenerated?: (audioUrl: string) => void;
 }
 
-export const ChatPrompt = ({ open, onClose }: ChatPromptProps) => {
+export const ChatPrompt = ({
+  open,
+  onClose,
+  onAudioGenerated,
+}: ChatPromptProps) => {
   const [text, setText] = useState("");
   const [selectedModel, setSelectedModel] = useState("mistral:7b");
   const [availableModels, setAvailableModels] = useState<string[]>([]);
@@ -81,33 +86,109 @@ export const ChatPrompt = ({ open, onClose }: ChatPromptProps) => {
     setStatus("submitted");
 
     try {
+      const userMessage = text.trim();
+
+      // Clear input immediately for better UX
+      setText("");
+      setAttachments([]);
+
       setTimeout(() => {
         setStatus("streaming");
       }, 200);
 
-      const response = await fetch("http://localhost:5004/chat", {
+      // Step 1: Query RAG system for relevant context
+      console.log("🔍 Querying RAG system for context...");
+      let ragContext = "";
+      try {
+        const ragResponse = await fetch("http://localhost:5003/query", {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({ query: userMessage }),
+        });
+
+        if (ragResponse.ok) {
+          const ragData = await ragResponse.json();
+          if (ragData.has_context) {
+            ragContext = ragData.context;
+            console.log(
+              "✅ RAG Context retrieved:",
+              ragData.contexts?.length || 0,
+              "chunks"
+            );
+          } else {
+            console.log("ℹ No relevant context found in documents");
+          }
+        } else {
+          console.warn("⚠ RAG server unavailable, continuing without context");
+        }
+      } catch (error) {
+        console.warn("⚠ RAG query failed:", error);
+        console.log("  Continuing without document context...");
+      }
+
+      // Step 2: Build system prompt with context
+      let systemPrompt =
+        "Kamu adalah asisten AI yang membantu. Selalu jawab dalam Bahasa Indonesia yang sopan dan jelas. Berikan jawaban yang SINGKAT dan LANGSUNG KE INTI. Jangan memberikan penjelasan panjang kecuali diminta. Untuk pertanyaan sederhana, jawab dengan 1-2 kalimat saja.";
+
+      if (ragContext) {
+        systemPrompt += `\n\nGunakan informasi berikut sebagai referensi untuk menjawab pertanyaan:\n\n${ragContext}\n\nJawab berdasarkan informasi di atas jika relevan dengan pertanyaan. Jika informasi tidak cukup atau tidak relevan, jawab berdasarkan pengetahuan umum.`;
+      }
+
+      // Step 3: Send to LLM using ollama library for streaming
+      console.log("🤖 Sending to LLM...");
+      const ollama = (await import("ollama")).default;
+
+      const stream = await ollama.chat({
+        model: selectedModel,
+        messages: [
+          {
+            role: "system",
+            content: systemPrompt,
+          },
+          {
+            role: "user",
+            content: userMessage,
+          },
+        ],
+        stream: true,
+      });
+
+      let fullResponse = "";
+      for await (const part of stream) {
+        if (part.message.content) {
+          fullResponse += part.message.content;
+        }
+      }
+      console.log("✅ LLM Response:", fullResponse);
+
+      // Step 4: Send LLM response to TTS server
+      console.log("🔊 Sending to TTS for speech synthesis...");
+      const ttsResponse = await fetch("http://localhost:5002/synthesize", {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
         },
-        body: JSON.stringify({
-          model: selectedModel,
-          messages: [{ role: "user", content: text }],
-          stream: false,
-        }),
+        body: JSON.stringify({ text: fullResponse }),
       });
 
-      const data = await response.json();
-      const assistantResponse = data.message?.content || "No response";
+      if (!ttsResponse.ok) {
+        throw new Error("TTS synthesis failed");
+      }
 
-      // TODO: Send response to TTS for character to speak
-      console.log("AI Response:", assistantResponse);
+      const ttsAudioBlob = await ttsResponse.blob();
+      const audioUrl = URL.createObjectURL(ttsAudioBlob);
+      console.log("✅ TTS audio generated");
+
+      // Step 5: Trigger avatar to speak through callback
+      if (onAudioGenerated) {
+        onAudioGenerated(audioUrl);
+      }
 
       setStatus("ready");
-      setText("");
-      setAttachments([]);
     } catch (error) {
-      console.error("Failed to send message:", error);
+      console.error("❌ Failed to process chat message:", error);
       setStatus("error");
       setTimeout(() => {
         setStatus("ready");

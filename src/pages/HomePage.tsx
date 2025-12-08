@@ -45,7 +45,10 @@ const HomePage = () => {
   };
 
   return (
-    <div className="flex flex-col h-screen w-full">
+    <div
+      className="flex flex-col w-full"
+      style={{ height: "calc(var(--vh, 1vh) * 100)" }}
+    >
       {/* Create Thread Dialog */}
       <Dialog open={dialogIsOpen} onOpenChange={setDialogIsOpen}>
         <DialogContent>

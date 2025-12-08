@@ -94,6 +94,67 @@ const AvatarPage = () => {
     }
   };
 
+  // Handle audio playback from chat input
+  const handleChatAudioGenerated = (audioUrl: string) => {
+    console.log("🔊 Playing audio from chat input...");
+
+    if (audioRef.current) {
+      audioRef.current.src = audioUrl;
+
+      // Setup audio analysis for mouth animation (only once)
+      if (!isAudioSetupRef.current && audioRef.current) {
+        const audioContext = new AudioContext();
+        const audioElement = audioRef.current;
+        const source = audioContext.createMediaElementSource(audioElement);
+        const analyser = audioContext.createAnalyser();
+        analyser.fftSize = 256;
+        source.connect(analyser);
+        analyser.connect(audioContext.destination);
+
+        audioContextRef.current = audioContext;
+        analyserRef.current = analyser;
+        isAudioSetupRef.current = true;
+      }
+
+      // Animate mouth based on TTS audio
+      if (analyserRef.current) {
+        const dataArray = new Uint8Array(analyserRef.current.frequencyBinCount);
+        let isPlaying = true;
+
+        const animateMouth = () => {
+          if (!isPlaying || !analyserRef.current) return;
+
+          analyserRef.current.getByteFrequencyData(dataArray);
+          const sum = dataArray.reduce((a, b) => a + b, 0);
+          const average = sum / dataArray.length;
+          const mouthValue = Math.min(Math.max((average - 5) / 50, 0), 1);
+
+          if (vrmViewerRef.current) {
+            vrmViewerRef.current.setExpression("aa", mouthValue);
+          }
+
+          requestAnimationFrame(animateMouth);
+        };
+
+        // Start animation when audio plays
+        audioRef.current.onplay = () => {
+          isPlaying = true;
+          animateMouth();
+        };
+
+        // Stop animation when audio ends
+        audioRef.current.onended = () => {
+          isPlaying = false;
+          if (vrmViewerRef.current) {
+            vrmViewerRef.current.setExpression("aa", 0);
+          }
+        };
+      }
+
+      audioRef.current.play();
+    }
+  };
+
   const startRecording = async () => {
     try {
       // Request audio permission on first use
@@ -761,7 +822,10 @@ const AvatarPage = () => {
   }, [hideGridAxes]);
 
   return (
-    <div className="flex flex-col h-screen w-full fixed inset-0 overflow-hidden lg:pl-64">
+    <div
+      className="flex flex-col w-full fixed inset-0 overflow-hidden lg:pl-64"
+      style={{ height: "calc(var(--vh, 1vh) * 100)" }}
+    >
       {/* Error Display */}
       {error && (
         <div className="absolute inset-0 bg-black/80 backdrop-blur-sm z-[60] flex items-center justify-center lg:left-64">
@@ -926,6 +990,7 @@ const AvatarPage = () => {
       <ChatPrompt
         open={showChatPrompt}
         onClose={() => setShowChatPrompt(false)}
+        onAudioGenerated={handleChatAudioGenerated}
       />
 
       {/* 3D Avatar Selection Modal */}

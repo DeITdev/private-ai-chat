@@ -42,8 +42,19 @@ const AvatarGLTFPage = () => {
   const gltfViewerRef = useRef<GLTFViewerRef>(null);
   const fileInputRef = useRef<HTMLInputElement | null>(null);
   const dragCounterRef = useRef(0);
+  const audioRef = useRef<HTMLAudioElement | null>(null);
   const { toggleSidebar } = useSidebar();
   const { theme } = useTheme();
+
+  // Handle audio playback from chat input
+  const handleChatAudioGenerated = (audioUrl: string) => {
+    console.log("🔊 Playing audio from chat input...");
+
+    if (audioRef.current) {
+      audioRef.current.src = audioUrl;
+      audioRef.current.play();
+    }
+  };
 
   const handleUploadModel = () => {
     fileInputRef.current?.click();
@@ -421,7 +432,8 @@ const AvatarGLTFPage = () => {
 
   return (
     <div
-      className="flex flex-col h-screen w-full fixed inset-0 overflow-hidden lg:pl-64"
+      className="flex flex-col w-full fixed inset-0 overflow-hidden lg:pl-64"
+      style={{ height: "calc(var(--vh, 1vh) * 100)" }}
       onDragEnter={handleDragEnter}
       onDragLeave={handleDragLeave}
       onDragOver={handleDragOver}
@@ -609,6 +621,7 @@ const AvatarGLTFPage = () => {
       <ChatPrompt
         open={showChatPrompt}
         onClose={() => setShowChatPrompt(false)}
+        onAudioGenerated={handleChatAudioGenerated}
       />
 
       {/* 3D Avatar Selection Modal */}
@@ -623,6 +636,7 @@ const AvatarGLTFPage = () => {
         descriptionId="avatar-dialog-description"
       />
 
+      <audio ref={audioRef} className="hidden" />
       <input
         ref={fileInputRef}
         type="file"

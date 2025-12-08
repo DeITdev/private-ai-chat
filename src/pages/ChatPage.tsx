@@ -163,7 +163,10 @@ const ChatPage = () => {
   }, [streamedMessage, messages]);
 
   return (
-    <div className="flex flex-col flex-1">
+    <div
+      className="flex flex-col flex-1"
+      style={{ height: "calc(var(--vh, 1vh) * 100)" }}
+    >
       <header className="flex items-center px-4 h-16 border-b">
         <h1 className="text-xl font-bold ml-4">AI Chat Dashboard</h1>
       </header>
