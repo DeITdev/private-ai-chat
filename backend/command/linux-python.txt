@@ -11,7 +11,8 @@ pip install -r requirements.txt
 pip install openai-whisper
 
 # Install ffmpeg (required dependency)
-brew install ffmpeg
+sudo apt update
+sudo apt install ffmpeg
 
 # deactivate the virtual environment when done
 deactivate

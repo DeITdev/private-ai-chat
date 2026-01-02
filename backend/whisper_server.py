@@ -7,11 +7,11 @@ import os
 app = Flask(__name__)
 CORS(app)  # Enable CORS for all routes
 
-# Load Whisper model (use 'base' for good balance of speed and accuracy)
-print("Loading Whisper model...")
-# You can change "base" to "tiny", "small", "medium", or "large" based on your needs
-model = whisper.load_model("base")
-print("Whisper model loaded successfully!")
+# Load Whisper model on GPU for fast transcription
+print("Loading Whisper model on GPU...")
+# Options: tiny (~1GB), base (~1GB), small (~2GB), medium (~5GB), large (~10GB)
+model = whisper.load_model("base")  # Good balance of speed and accuracy
+print("Whisper model loaded successfully on GPU!")
 
 
 @app.route('/transcribe', methods=['POST'])
