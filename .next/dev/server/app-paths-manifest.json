@@ -1,5 +1,0 @@
-{
-  "/avatar-vrm/page": "app/avatar-vrm/page.js",
-  "/page": "app/page.js",
-  "/thread/[threadId]/page": "app/thread/[threadId]/page.js"
-}
