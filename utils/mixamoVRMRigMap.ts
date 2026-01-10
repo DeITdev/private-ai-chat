@@ -1,5 +1,7 @@
 /**
  * A map from Mixamo rig name to VRM Humanoid bone name
+ * Note: Shoulder bones are intentionally skipped to prevent arm stretching issues
+ * when remapping Mixamo animations to VRM models with different rest poses.
  */
 export const mixamoVRMRigMap: Record<string, string> = {
   mixamorigHips: "hips",
@@ -8,7 +10,9 @@ export const mixamoVRMRigMap: Record<string, string> = {
   mixamorigSpine2: "upperChest",
   mixamorigNeck: "neck",
   mixamorigHead: "head",
-  mixamorigLeftShoulder: "leftShoulder",
+  // Shoulder bones skipped to prevent arm stretching - upper arm handles arm movement
+  // mixamorigLeftShoulder: "leftShoulder",
+  // mixamorigRightShoulder: "rightShoulder",
   mixamorigLeftArm: "leftUpperArm",
   mixamorigLeftForeArm: "leftLowerArm",
   mixamorigLeftHand: "leftHand",
@@ -27,7 +31,6 @@ export const mixamoVRMRigMap: Record<string, string> = {
   mixamorigLeftHandPinky1: "leftLittleProximal",
   mixamorigLeftHandPinky2: "leftLittleIntermediate",
   mixamorigLeftHandPinky3: "leftLittleDistal",
-  mixamorigRightShoulder: "rightShoulder",
   mixamorigRightArm: "rightUpperArm",
   mixamorigRightForeArm: "rightLowerArm",
   mixamorigRightHand: "rightHand",

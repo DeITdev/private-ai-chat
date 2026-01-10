@@ -13,7 +13,7 @@ import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { predefinedPoses, predefinedAnimations } from "@/constants";
-import { Trash2, Download, Upload } from "lucide-react";
+import { Trash2, Download, Upload, AlertTriangle } from "lucide-react";
 
 interface PoseData {
   name?: string;
@@ -82,6 +82,10 @@ interface VRMDatGUIControlProps {
   shapeKeys?: ShapeKey[];
   springBones?: SpringBone[];
   animationSpeed?: number;
+  lightIntensity?: number;
+  backgroundColor?: string;
+  onLightIntensityChange?: (intensity: number) => void;
+  onBackgroundColorChange?: (color: string) => void;
 }
 
 export const VRMDatGUIControl = ({
@@ -96,7 +100,11 @@ export const VRMDatGUIControl = ({
   expressions = [],
   shapeKeys = [],
   springBones = [],
-  animationSpeed = 0.5,
+  animationSpeed = 1,
+  lightIntensity = 1,
+  backgroundColor = "",
+  onLightIntensityChange,
+  onBackgroundColorChange,
 }: VRMDatGUIControlProps) => {
   const [showControls, setShowControls] = useState(false);
   const [customPoses, setCustomPoses] = useState<CustomPose[]>([]);
@@ -105,9 +113,13 @@ export const VRMDatGUIControl = ({
   const [showAddPose, setShowAddPose] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const animationFileInputRef = useRef<HTMLInputElement>(null);
+  const hdrFileInputRef = useRef<HTMLInputElement>(null);
   const [customAnimations, setCustomAnimations] = useState<Animation[]>([]);
   const [animationSpeedInput, setAnimationSpeedInput] = useState(
     animationSpeed.toString()
+  );
+  const [lightIntensityInput, setLightIntensityInput] = useState(
+    lightIntensity.toString()
   );
 
   // Expression input states
@@ -161,6 +173,19 @@ export const VRMDatGUIControl = ({
   useEffect(() => {
     setAnimationSpeedInput(animationSpeed.toString());
   }, [animationSpeed]);
+
+  useEffect(() => {
+    setLightIntensityInput(lightIntensity.toString());
+  }, [lightIntensity]);
+
+  // Reset bone mode when a new model is loaded (expressions change = new model)
+  useEffect(() => {
+    if (boneMode !== "off") {
+      setBoneMode("off");
+      onBoneManipulationModeChange?.("off");
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [expressions]);
 
   const handlePoseClick = async (posePath: string) => {
     try {
@@ -300,11 +325,131 @@ export const VRMDatGUIControl = ({
     setCustomAnimations(customAnimations.filter((_, i) => i !== index));
   };
 
+  const handleLightIntensityInputChange = (value: string) => {
+    setLightIntensityInput(value);
+  };
+
+  const handleLightIntensityInputBlur = () => {
+    const value = parseFloat(lightIntensityInput.replace(",", ".") || "1");
+    if (!isNaN(value)) {
+      const clamped = Math.max(0, Math.min(5, value));
+      onLightIntensityChange?.(clamped);
+    } else {
+      setLightIntensityInput(lightIntensity.toString());
+    }
+  };
+
   return (
     <>
       {showControls ? (
         <div className="absolute top-20 right-4 w-[200px] md:w-[280px] lg:w-[320px] max-h-[calc(100%-100px)] overflow-y-auto bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/90 border rounded-lg shadow-lg z-[45]">
-          <Accordion type="multiple" defaultValue={[]} className="w-full">
+          <Accordion
+            type="multiple"
+            defaultValue={[]}
+            className="w-full"
+            onValueChange={(openSections) => {
+              // Reset bone mode to off when Posing accordion is closed
+              if (!openSections.includes("posing") && boneMode !== "off") {
+                handleBoneModeChange("off");
+              }
+            }}
+          >
+            {/* Scene Controls */}
+            <AccordionItem value="scene">
+              <AccordionTrigger className="px-4 py-3 text-base font-semibold">
+                Scene
+              </AccordionTrigger>
+              <AccordionContent className="px-4 pb-4 space-y-4">
+                {/* Environment map section */}
+                <div className="space-y-2">
+                  <Label className="text-sm font-semibold">Environment map</Label>
+                  
+                  {/* Warning message */}
+                  <div className="bg-amber-500/10 border border-amber-500/30 rounded-lg p-3 space-y-1">
+                    <div className="flex items-start gap-2">
+                      <AlertTriangle className="h-4 w-4 text-amber-500 mt-0.5 shrink-0" />
+                      <p className="text-sm text-amber-500 font-medium">
+                        Current model uses MeshToonMaterial.
+                      </p>
+                    </div>
+                    <p className="text-xs text-muted-foreground pl-6">
+                      ToonShader used by MeshToonMaterial does not support environment maps, so not all (if any) parts of model will be affected
+                    </p>
+                  </div>
+
+                  {/* HDR Upload/Drop Zone */}
+                  <div className="border-2 border-dashed rounded-lg p-4 text-center">
+                    <input
+                      ref={hdrFileInputRef}
+                      type="file"
+                      accept=".hdr"
+                      className="hidden"
+                    />
+                    <Upload className="mx-auto h-8 w-8 text-muted-foreground mb-2" />
+                    <p className="text-sm text-muted-foreground mb-2">
+                      Upload or drop <span className="text-primary">hdr</span> file here
+                    </p>
+                    <Button
+                      onClick={() => hdrFileInputRef.current?.click()}
+                      variant="outline"
+                      size="sm"
+                    >
+                      Choose File
+                    </Button>
+                  </div>
+                </div>
+
+                {/* Background Color */}
+                <div className="space-y-2">
+                  <Label className="text-sm font-semibold">Background</Label>
+                  <div className="flex items-center gap-2">
+                    <input
+                      type="color"
+                      value={backgroundColor || "#222428"}
+                      onChange={(e) => onBackgroundColorChange?.(e.target.value)}
+                      className="w-8 h-8 rounded border cursor-pointer"
+                    />
+                    <Input
+                      type="text"
+                      value={backgroundColor || "#222428"}
+                      onChange={(e) => onBackgroundColorChange?.(e.target.value)}
+                      placeholder="#222428"
+                      className="flex-1 h-8 text-sm font-mono"
+                    />
+                  </div>
+                </div>
+
+                {/* Light Intensity Control */}
+                <div className="space-y-2">
+                  <Label className="text-sm font-semibold">Change light intensity</Label>
+                  <div className="space-y-1">
+                    <div className="flex items-center justify-between">
+                      <Input
+                        type="text"
+                        inputMode="decimal"
+                        value={lightIntensityInput}
+                        onChange={(e) => handleLightIntensityInputChange(e.target.value)}
+                        onBlur={handleLightIntensityInputBlur}
+                        onKeyDown={(e) => {
+                          if (e.key === "Enter") {
+                            e.currentTarget.blur();
+                          }
+                        }}
+                        className="w-20 h-7 text-xs"
+                      />
+                    </div>
+                    <Slider
+                      min={0}
+                      max={5}
+                      step={0.01}
+                      value={[lightIntensity]}
+                      onValueChange={([value]) => onLightIntensityChange?.(value)}
+                    />
+                  </div>
+                </div>
+              </AccordionContent>
+            </AccordionItem>
+
             {/* Animations Controls */}
             <AccordionItem value="animations">
               <AccordionTrigger className="px-4 py-3 text-base font-semibold">
@@ -552,6 +697,8 @@ export const VRMDatGUIControl = ({
                         onClick={() => {
                           setShowAddPose(false);
                           setNewPoseName("");
+                          // Reset bone mode to off when discarding
+                          handleBoneModeChange("off");
                         }}
                         variant="outline"
                         size="sm"
@@ -1030,7 +1177,11 @@ export const VRMDatGUIControl = ({
           {/* Close Control Button */}
           <div className="p-4 border-t">
             <Button
-              onClick={() => setShowControls(false)}
+              onClick={() => {
+                // Reset bone mode to off when closing controls
+                handleBoneModeChange("off");
+                setShowControls(false);
+              }}
               variant="outline"
               className="w-full"
             >

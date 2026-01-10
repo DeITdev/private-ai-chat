@@ -51,7 +51,9 @@ export default function AvatarVRMPage() {
   const [cameraFollowCharacter, setCameraFollowCharacter] = useState(false);
   const [hideGridAxes, setHideGridAxes] = useState(false);
   const [viewerMode, setViewerMode] = useState<"vrm" | "gltf">("vrm");
-  const [animationSpeed, setAnimationSpeed] = useState(0.5);
+  const [animationSpeed, setAnimationSpeed] = useState(1);
+  const [lightIntensity, setLightIntensity] = useState(1);
+  const [backgroundColor, setBackgroundColor] = useState("");
 
   // VRM Control states
   const [expressions, setExpressions] = useState<
@@ -554,7 +556,9 @@ export default function AvatarVRMPage() {
     if (vrmViewerRef.current) {
       try {
         await vrmViewerRef.current.loadAnimation(animationUrl);
-        console.log("✅ Animation loaded:", animationUrl);
+        // Apply the current animation speed after loading
+        vrmViewerRef.current.setAnimationSpeed(animationSpeed);
+        console.log("✅ Animation loaded:", animationUrl, "at speed:", animationSpeed);
       } catch (error) {
         console.error("❌ Failed to load animation:", error);
       }
@@ -565,6 +569,20 @@ export default function AvatarVRMPage() {
     setAnimationSpeed(speed);
     if (vrmViewerRef.current) {
       vrmViewerRef.current.setAnimationSpeed(speed);
+    }
+  };
+
+  const handleLightIntensityChange = (intensity: number) => {
+    setLightIntensity(intensity);
+    if (vrmViewerRef.current) {
+      vrmViewerRef.current.setLightIntensity(intensity);
+    }
+  };
+
+  const handleBackgroundColorChange = (color: string) => {
+    setBackgroundColor(color);
+    if (vrmViewerRef.current) {
+      vrmViewerRef.current.setBackgroundColor(color);
     }
   };
 
@@ -760,6 +778,27 @@ export default function AvatarVRMPage() {
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []); // Only run on mount
+
+  // Apply smooth camera setting when it changes
+  useEffect(() => {
+    if (vrmViewerRef.current) {
+      vrmViewerRef.current.setCameraControlsEnabled(enableSmoothCamera);
+    }
+  }, [enableSmoothCamera]);
+
+  // Apply camera follow character setting when it changes
+  useEffect(() => {
+    if (vrmViewerRef.current) {
+      vrmViewerRef.current.setCameraFollowCharacter(cameraFollowCharacter);
+    }
+  }, [cameraFollowCharacter]);
+
+  // Apply hide grid/axes setting when it changes
+  useEffect(() => {
+    if (vrmViewerRef.current) {
+      vrmViewerRef.current.setHideGridAxes(hideGridAxes);
+    }
+  }, [hideGridAxes]);
 
   // Periodic blink idle animation
   useEffect(() => {
@@ -985,6 +1024,8 @@ export default function AvatarVRMPage() {
             shapeKeys={shapeKeys}
             springBones={springBones}
             animationSpeed={animationSpeed}
+            lightIntensity={lightIntensity}
+            backgroundColor={backgroundColor}
             onExpressionChange={handleExpressionChange}
             onShapeKeyChange={handleShapeKeyChange}
             onSpringBoneSettingChange={handleSpringBoneSettingChange}
@@ -993,6 +1034,8 @@ export default function AvatarVRMPage() {
             onSavePose={handleSavePose}
             onAnimationPlay={handleAnimationPlay}
             onAnimationSpeedChange={handleAnimationSpeedChange}
+            onLightIntensityChange={handleLightIntensityChange}
+            onBackgroundColorChange={handleBackgroundColorChange}
           />
         )}
       </main>

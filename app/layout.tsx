@@ -9,7 +9,7 @@ import { ViewportHandler } from "@/components/ViewportHandler";
 const inter = Inter({ subsets: ["latin"] });
 
 export const metadata: Metadata = {
-  title: "Larasdyah AI Virtual Assistant",
+  title: "Private AI Virtual Assistant",
   description: "Private AI Chat Assistant",
   appleWebApp: {
     capable: true,
@@ -33,7 +33,8 @@ export default function RootLayout({
   return (
     <html lang="en" suppressHydrationWarning>
       <head>
-        <link rel="icon" type="image/svg+xml" href="/larasdyah-logo.svg" />
+        <link rel="icon" type="image/svg+xml" href="/personal-logo-dark.svg" media="(prefers-color-scheme: dark)" />
+        <link rel="icon" type="image/svg+xml" href="/personal-logo-light.svg" media="(prefers-color-scheme: light)" />
       </head>
       <body className={inter.className}>
         <ThemeProvider defaultTheme="dark" storageKey="theme">

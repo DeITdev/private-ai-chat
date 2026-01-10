@@ -50,6 +50,8 @@ export interface VRMViewerRef {
   setShapeKey: (name: string, value: number) => void;
   getCurrentPoseData: () => PoseData | null;
   setBoneManipulationMode: (mode: BoneManipulationMode) => void;
+  setLightIntensity: (intensity: number) => void;
+  setBackgroundColor: (color: string) => void;
 }
 
 export const VRMViewer = forwardRef<VRMViewerRef>((_, ref) => {
@@ -87,6 +89,8 @@ export const VRMViewer = forwardRef<VRMViewerRef>((_, ref) => {
   const boneManipulationControllerRef =
     useRef<BoneManipulationController | null>(null);
   const rendererRef = useRef<THREE.WebGLRenderer | null>(null);
+  const directionalLightRef = useRef<THREE.DirectionalLight | null>(null);
+  const ambientLightRef = useRef<THREE.AmbientLight | null>(null);
 
   useImperativeHandle(ref, () => ({
     setExpression: (name: string, value: number) => {
@@ -234,6 +238,24 @@ export const VRMViewer = forwardRef<VRMViewerRef>((_, ref) => {
     clearScene: () => {
       if (!sceneRef.current) return;
 
+      // Stop and clear animation state
+      if (currentAnimationRef.current) {
+        currentAnimationRef.current.stop();
+        currentAnimationRef.current = null;
+      }
+      if (mixerRef.current) {
+        mixerRef.current.stopAllAction();
+        mixerRef.current = null;
+      }
+      // Clear loaded animations cache since they're tied to the old VRM
+      loadedAnimationsRef.current.clear();
+
+      // Dispose bone manipulation controller since it's tied to the old VRM
+      if (boneManipulationControllerRef.current) {
+        boneManipulationControllerRef.current.dispose();
+        boneManipulationControllerRef.current = null;
+      };
+
       // Simply remove VRM models from scene (like R3F does on unmount)
       const childrenToRemove = sceneRef.current.children.filter(
         (child) =>
@@ -247,7 +269,7 @@ export const VRMViewer = forwardRef<VRMViewerRef>((_, ref) => {
       });
 
       vrmRef.current = null;
-      console.log("✅ Scene cleared (models removed, textures preserved)");
+      console.log("✅ Scene cleared (models removed, animations reset)");
     },
     loadVRM: async (
       arrayBufferOrUrl: ArrayBuffer | string,
@@ -389,12 +411,16 @@ export const VRMViewer = forwardRef<VRMViewerRef>((_, ref) => {
           VRMUtils.removeUnnecessaryVertices(gltf.scene);
           VRMUtils.removeUnnecessaryJoints(gltf.scene);
 
+          // Keep original materials (MeshToonMaterial for VRM models)
           vrm.scene.traverse((obj: THREE.Object3D) => {
             obj.frustumCulled = false;
           });
 
           sceneRef.current?.add(vrm.scene);
           vrmRef.current = vrm;
+
+          // Rotate VRM to face the camera (face the user, not show their back)
+          vrm.scene.rotation.y = Math.PI;
 
           // Auto-adjust camera to fit the model
           if (cameraRef.current && controlsRef.current) {
@@ -784,6 +810,19 @@ export const VRMViewer = forwardRef<VRMViewerRef>((_, ref) => {
 
       boneManipulationControllerRef.current.setMode(mode);
     },
+    setLightIntensity: (intensity: number) => {
+      if (directionalLightRef.current) {
+        directionalLightRef.current.intensity = intensity * Math.PI;
+      }
+      if (ambientLightRef.current) {
+        ambientLightRef.current.intensity = intensity * 0.5;
+      }
+    },
+    setBackgroundColor: (color: string) => {
+      if (sceneRef.current) {
+        sceneRef.current.background = new THREE.Color(color);
+      }
+    },
   }));
 
   const playAnimation = (clip: THREE.AnimationClip) => {
@@ -924,14 +963,16 @@ export const VRMViewer = forwardRef<VRMViewerRef>((_, ref) => {
     const scene = new THREE.Scene();
     sceneRef.current = scene;
 
-    // Add lighting
+    // Add lighting - positioned in front of the character to avoid face shadows
     const light = new THREE.DirectionalLight(0xffffff, Math.PI);
-    light.position.set(1.0, 1.0, 1.0).normalize();
+    light.position.set(0, 1.0, 1.0).normalize();
     scene.add(light);
+    directionalLightRef.current = light;
 
     // Add ambient light for better visibility
     const ambientLight = new THREE.AmbientLight(0xffffff, 0.5);
     scene.add(ambientLight);
+    ambientLightRef.current = ambientLight;
 
     // Setup loader
     const loader = new GLTFLoader();

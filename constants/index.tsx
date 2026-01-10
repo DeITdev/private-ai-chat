@@ -39,6 +39,36 @@ export const predefinedAvatars = [
     path: "/models/vrm/orpheus_zzz.vrm",
     thumbnail: "/images/orpheus-icon.png",
   },
+  {
+    name: "Ani Grok",
+    path: "/models/vrm/ani_grok.vrm",
+    thumbnail: "/images/ani-grok-icon.png",
+  },
+  {
+    name: "Cartethyia",
+    path: "/models/vrm/cartethyia_wuwa.vrm",
+    thumbnail: "/images/cartethyia-icon.png",
+  },
+  {
+    name: "Chen Qianyu",
+    path: "/models/vrm/chen_qianyu_endfield.vrm",
+    thumbnail: "/images/chen-qianyu-icon.png",
+  },
+  {
+    name: "Fleurdelis",
+    path: "/models/vrm/fleurdelis_wuwa.vrm",
+    thumbnail: "/images/fleurdelis-icon.png",
+  },
+  {
+    name: "The Herta",
+    path: "/models/vrm/the_herta_HSR.vrm",
+    thumbnail: "/images/the-herta-icon.png",
+  },
+  {
+    name: "Yangyang",
+    path: "/models/vrm/yangyang_wuwa.vrm",
+    thumbnail: "/images/yangyang-icon.png",
+  },
 ];
 
 export const predefinedAnimations = [
