@@ -5,7 +5,7 @@ flask-cors
 # Speech Recognition (Whisper)
 openai-whisper
 
-# Text-to-Speech (MMS-TTS)
+# Text-to-Speech (MMS-TTS - legacy)
 transformers
 accelerate
 
@@ -19,6 +19,7 @@ numpy
 scipy
 librosa
 soundfile
+sounddevice
 
 # RAG (Retrieval-Augmented Generation)
 chromadb
@@ -26,3 +27,34 @@ sentence-transformers
 PyPDF2
 langchain
 langchain-community
+
+# IMS-Toucan TTS Dependencies
+pyloudnorm
+matplotlib
+phonemizer
+speechbrain
+epitran
+praat-parselmouth
+pypinyin
+cvxopt
+dragonmapper
+alias_free_torch
+dotwiz
+transphone
+phonepiece
+geopy
+einops
+datasets
+pandas
+rich
+PyYAML
+imageio
+pykakasi
+jamo
+g2pk
+pykan
+huggingface-hub
+networkx
+scikit-learn
+torch_complex
+tqdm

@@ -949,9 +949,9 @@ export const VRMViewer = forwardRef<VRMViewerRef>((_, ref) => {
     controls.enableZoom = true;
     controls.zoomSpeed = 1.0;
 
-    // Set distance constraints
-    controls.minDistance = 1;
-    controls.maxDistance = 10;
+    // No zoom distance limits - allow unlimited zoom in/out
+    controls.minDistance = 0;
+    controls.maxDistance = Infinity;
 
     // Allow full 360-degree rotation (no polar angle limits)
     // controls.maxPolarAngle = Math.PI / 2; // Removed to allow full rotation
