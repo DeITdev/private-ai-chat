@@ -122,10 +122,10 @@ export const VRMViewer = forwardRef<VRMViewerRef>((_, ref) => {
         currentAnimationRef.current = null;
       }
 
-      // Reset VRM position to origin
+      // Reset VRM position to origin and face camera (180 degree Y rotation)
       if (vrmRef.current?.scene) {
         vrmRef.current.scene.position.set(0, 0, 0);
-        vrmRef.current.scene.rotation.set(0, 0, 0);
+        vrmRef.current.scene.rotation.set(0, Math.PI, 0); // Face camera
       }
 
       // Reset all bone rotations to T-pose

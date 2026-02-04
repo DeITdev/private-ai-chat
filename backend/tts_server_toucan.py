@@ -11,8 +11,8 @@ import tempfile
 import os
 import sys
 
-# Add IMS-Toucan to path (assumes it's cloned at ../IMS-Toucan)
-TOUCAN_PATH = os.path.join(os.path.dirname(__file__), "..", "IMS-Toucan")
+# Add IMS-Toucan to path (installed globally in home directory)
+TOUCAN_PATH = os.path.expanduser("~/IMS-Toucan")
 if os.path.exists(TOUCAN_PATH):
     sys.path.insert(0, TOUCAN_PATH)
 
@@ -26,10 +26,15 @@ controllable_interface = None
 DEVICE = "cpu"
 SAMPLE_RATE = 24000  # Toucan outputs 24kHz audio
 
-# Default voice settings
+# Default voice settings (matching HuggingFace demo config)
 DEFAULT_LANGUAGE = "ind"  # Indonesian (ISO 639-3)
-DEFAULT_VOICE_SEED = 5  # Random voice seed (0-10)
-DEFAULT_GENDER = 10  # Gender: -10 (male) to 10 (female) - set to 10 for girl voice
+DEFAULT_VOICE_SEED = 0  # Random voice seed (0-10)
+DEFAULT_GENDER = 0  # Gender: -10 (male) to 10 (female)
+DEFAULT_PROSODY_CREATIVITY = 0.8  # Max prosody variation
+DEFAULT_DURATION_SCALE = 1.0  # Normal speed
+
+# Reference audio for voice cloning (Batari Indonesian female voice)
+REFERENCE_AUDIO_PATH = os.path.join(os.path.dirname(__file__), "data", "sound", "BatariIndonesian_female.mp3")
 
 
 def get_tts():
@@ -82,14 +87,17 @@ def synthesize_speech():
         language = data.get('language', DEFAULT_LANGUAGE)
         voice_seed = int(data.get('voice_seed', DEFAULT_VOICE_SEED))
         gender = float(data.get('gender', DEFAULT_GENDER))
-        prosody_creativity = float(data.get('prosody_creativity', 0.5))
-        duration_scale = float(data.get('duration_scale', 1.0))
+        prosody_creativity = float(data.get('prosody_creativity', DEFAULT_PROSODY_CREATIVITY))
+        duration_scale = float(data.get('duration_scale', DEFAULT_DURATION_SCALE))
         pitch_variance = float(data.get('pitch_variance', 1.0))
         energy_variance = float(data.get('energy_variance', 1.0))
-        reference_audio = data.get('reference_audio', None)
+        
+        # Use reference audio by default (Batari Indonesian female voice)
+        reference_audio = data.get('reference_audio', REFERENCE_AUDIO_PATH)
         
         # Validate reference audio path
         if reference_audio and not os.path.exists(reference_audio):
+            print(f"Warning: Reference audio not found at {reference_audio}, using artificial voice")
             reference_audio = None
         
         # Clamp values to valid ranges
@@ -122,7 +130,7 @@ def synthesize_speech():
             emb_slider_4=0,
             emb_slider_5=0,
             emb_slider_6=0,
-            loudness_in_db=-29.0
+            loudness_in_db=-16.0  # Increased from -29 for louder output
         )
 
         # Save to temporary WAV file
@@ -202,10 +210,15 @@ if __name__ == '__main__':
     print(f"Device: {DEVICE}")
     print("Server will run on http://localhost:5002")
     print(f"Language: {DEFAULT_LANGUAGE} (Indonesian)")
+    print(f"Reference Voice: {REFERENCE_AUDIO_PATH}")
+    print("\nVoice Settings:")
+    print(f"  Voice Seed: {DEFAULT_VOICE_SEED}")
+    print(f"  Gender: {DEFAULT_GENDER}")
+    print(f"  Prosody Creativity: {DEFAULT_PROSODY_CREATIVITY}")
+    print(f"  Duration Scale: {DEFAULT_DURATION_SCALE}")
     print("\nFeatures:")
+    print("  ✓ Voice cloning from Batari Indonesian female")
     print("  ✓ Gender control (-10 male to +10 female)")
-    print("  ✓ Voice seed selection (50 pre-generated voices)")
-    print("  ✓ Voice cloning from reference audio")
     print("  ✓ Prosody/speed/pitch control")
     print("\nEndpoints:")
     print("  POST /synthesize      - Convert text to speech")

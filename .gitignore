@@ -59,5 +59,4 @@ __pycache__/
 sentence_transformers/
 
 # IMS-Toucan
-IMS-Toucan
-/backend/Models 
+/backend/models 

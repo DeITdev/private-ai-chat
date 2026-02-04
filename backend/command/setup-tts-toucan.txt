@@ -1,0 +1,44 @@
+# IMS-Toucan TTS Server Setup Guide
+# ==================================
+
+## Prerequisites
+- Python 3.10+ with venv
+- Ubuntu/Debian (for apt packages)
+- GPU recommended but CPU works too
+
+## Step 1: Clone IMS-Toucan to home directory (global install)
+cd ~
+git clone https://github.com/DigitalPhonetics/IMS-Toucan.git
+cd ~/IMS-Toucan
+git checkout MassiveScaleToucan
+
+## Step 2: Install system dependencies
+sudo apt-get update
+sudo apt-get install -y libsndfile1 espeak-ng ffmpeg libasound-dev libportaudio2 libsqlite3-dev
+
+## Step 3: Activate virtual environment
+cd /home/danarit/Projects/private-ai-chat/backend
+source .venv/bin/activate
+
+## Step 4: Install Python dependencies
+pip install -r requirements.txt
+pip install speechbrain==0.5.13  # Important: must be this version
+
+## Step 5: Run TTS server
+python tts_server_toucan.py
+
+# Server will run on http://localhost:5002
+# First request will download models (~400MB) from HuggingFace
+
+## File Locations
+# - IMS-Toucan: ~/IMS-Toucan (NOT inside project)
+# - TTS Server: backend/tts_server_toucan.py
+# - Reference Audio: backend/data/sound/BatariIndonesian_female.mp3
+
+## Troubleshooting
+# - If CUDA out of memory: Server defaults to CPU (ok for real-time)
+# - If missing module: pip install <module_name>
+# - speechbrain version conflict: pip install speechbrain==0.5.13
+
+## Cleanup (if you had IMS-Toucan in project before)
+# rm -rf /home/danarit/Projects/private-ai-chat/IMS-Toucan
