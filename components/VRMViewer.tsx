@@ -435,16 +435,16 @@ export const VRMViewer = forwardRef<VRMViewerRef>((_, ref) => {
             let cameraDistance = Math.abs(maxDim / Math.sin(fov / 2));
             cameraDistance *= 1.5; // Add some padding
 
-            // Position camera to look at model center
+            // Position camera to look at x=0, z=0, preserving height
             const cameraHeight = center.y;
             cameraRef.current.position.set(
-              center.x,
+              0,
               cameraHeight,
-              center.z + cameraDistance
+              cameraDistance
             );
 
-            // Update controls target to model center
-            controlsRef.current.target.copy(center);
+            // Update controls target to x=0, z=0
+            controlsRef.current.target.set(0, center.y, 0);
             controlsRef.current.update();
 
             // Store initial camera position and target for reset feature

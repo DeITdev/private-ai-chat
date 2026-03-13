@@ -67,15 +67,19 @@ export const ChatSidebar = () => {
         router.push(`/thread/${activeThread}`);
       } else if (threads && threads.length > 0) {
         router.push(`/thread/${threads[0].id}`);
+      } else {
+        // No threads exist — open the create thread dialog
+        setDialogIsOpen(true);
       }
     }
   };
 
   const handleCreateThread = async () => {
-    await db.createThread(textInput);
+    const threadId = await db.createThread(textInput);
 
     setDialogIsOpen(false);
     setTextInput("");
+    router.push(`/thread/${threadId}`);
   };
 
   const handleOpenDialog = () => {
